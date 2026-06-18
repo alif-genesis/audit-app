@@ -1,0 +1,137 @@
+{
+  "node": {
+    "000018f6f6090996220c071045c6d90e9e907a1abc": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "hasActiveSession",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "hasActiveSession",
+      "filename": "app/login/actions.ts"
+    },
+    "001ed11d395b3b9065ab27f1a6bd47681857fe7003": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "userCanAccessAdminArea",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "userCanAccessAdminArea",
+      "filename": "app/login/actions.ts"
+    },
+    "00337adbb1b299c8500672a3ac3b3389548418c7a0": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "logoutAction",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "logoutAction",
+      "filename": "app/login/actions.ts"
+    },
+    "00461e60e5256eb1f1c4bb076906ad344e299df3ca": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "hasAdminSession",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "hasAdminSession",
+      "filename": "app/login/actions.ts"
+    },
+    "00c64cf8e2fb8aeccfaa63e5c08ad472aa69dceb6d": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "getSessionUser",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "getSessionUser",
+      "filename": "app/login/actions.ts"
+    },
+    "60c38c8f902d56e7d6054d07c5fec61713ed3ff744": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "loginAction",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "loginAction",
+      "filename": "app/login/actions.ts"
+    },
+    "6040fcb06b0574a55be74fe309e03cdda4b8581367": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "changePasswordAction",
+          "filename": "app/profile/actions.ts"
+        }
+      },
+      "exportedName": "changePasswordAction",
+      "filename": "app/profile/actions.ts"
+    },
+    "60418731b11456bdfe0df943be0c850c9b535a7590": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "updateProfileAction",
+          "filename": "app/profile/actions.ts"
+        }
+      },
+      "exportedName": "updateProfileAction",
+      "filename": "app/profile/actions.ts"
+    },
+    "60529199573015f1e99253799838ae9f6d28be3fc2": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "createCompanyAction",
+          "filename": "app/dashboard/companies/actions.ts"
+        }
+      },
+      "exportedName": "createCompanyAction",
+      "filename": "app/dashboard/companies/actions.ts"
+    },
+    "40cbbb86fe4077eae8cb73b71592aae1ac530918f3": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "deleteCompanyAction",
+          "filename": "app/dashboard/companies/actions.ts"
+        }
+      },
+      "exportedName": "deleteCompanyAction",
+      "filename": "app/dashboard/companies/actions.ts"
+    },
+    "60f4021dddd9872fb464ef95dc89faa26bfe62d98c": {
+      "workers": {
+        "app/dashboard/companies/page": {
+          "moduleId": 25989,
+          "async": false,
+          "exportedName": "updateCompanyAction",
+          "filename": "app/dashboard/companies/actions.ts"
+        }
+      },
+      "exportedName": "updateCompanyAction",
+      "filename": "app/dashboard/companies/actions.ts"
+    }
+  },
+  "edge": {}
+}

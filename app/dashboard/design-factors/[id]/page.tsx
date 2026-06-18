@@ -193,9 +193,20 @@ export default async function DesignFactorDetailPage({ params }: DesignFactorDet
           df10AuditeeSubmitted: Boolean(assessment.df10AuditeeSubmittedAt),
           df10AuditorSubmitted: Boolean(assessment.df10AuditorSubmittedAt),
         }}
+        saveState={parseDesignFactorSaveState(assessment.savedState)}
         canEdit={canEdit}
       />
     </AdminShell>
+  );
+}
+
+function parseDesignFactorSaveState(savedState: unknown) {
+  if (!savedState || typeof savedState !== "object" || Array.isArray(savedState)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(savedState as Record<string, unknown>).map(([key, value]) => [key, Boolean(value)]),
   );
 }
 

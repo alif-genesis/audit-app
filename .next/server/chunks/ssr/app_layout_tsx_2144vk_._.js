@@ -1,0 +1,3 @@
+module.exports=[33290,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function({children:a}){return(0,b.jsx)("html",{lang:"id",suppressHydrationWarning:!0,children:(0,b.jsx)("body",{suppressHydrationWarning:!0,children:a})})},"metadata",0,{title:"Aplikasi Audit - PT Genetika Solusi Bisnis",description:"Platform pengelolaan audit ISO, COBIT, dan audit tata kelola.",icons:{icon:"https://genetikasolusibisnis.co.id/wp-content/uploads/2022/09/genetika-1-warna.png",shortcut:"https://genetikasolusibisnis.co.id/wp-content/uploads/2022/09/genetika-1-warna.png",apple:"https://genetikasolusibisnis.co.id/wp-content/uploads/2022/09/genetika-1-warna.png"}}])},70864,a=>{a.n(a.i(33290))}];
+
+//# sourceMappingURL=app_layout_tsx_2144vk_._.js.map

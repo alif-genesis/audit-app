@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import {
   calculateDf01Results,
   calculateDf02Results,
@@ -47,6 +48,7 @@ export type DesignFactorFormState = {
     type: "success" | "error";
     message: string;
   };
+  savedKey?: string;
 };
 
 function parseNumber(value: FormDataEntryValue | null) {
@@ -371,6 +373,7 @@ export async function saveDf01AssessmentAction(
       df09AuditorSubmittedAt: true,
       df10AuditeeSubmittedAt: true,
       df10AuditorSubmittedAt: true,
+      savedState: true,
       df01Input: true,
       df02Input: true,
       df03Input: true,
@@ -620,9 +623,12 @@ export async function saveDf01AssessmentAction(
 
       await tx.designFactorAssessment.update({
         where: { id: assessmentId },
-        data: isSubmitAll
-          ? buildAllSubmissionUpdate(assessment, actorSide)
-          : buildSubmissionUpdate(assessment, designFactor, actorSide, isSubmit),
+        data: {
+          ...(isSubmitAll
+            ? buildAllSubmissionUpdate(assessment, actorSide)
+            : buildSubmissionUpdate(assessment, designFactor, actorSide, isSubmit)),
+          ...buildSavedStateUpdate(assessment.savedState, designFactor, actorSide, isSubmitAll),
+        },
       });
     });
 
@@ -647,6 +653,7 @@ export async function saveDf01AssessmentAction(
         type: "success",
         message: isSubmitAll ? "Design Factor berhasil disubmit final." : isSubmit ? `${designFactor} berhasil disubmit.` : `${designFactor} berhasil disimpan.`,
       },
+      savedKey: actorSide === "AUDITEE" || actorSide === "AUDITOR" ? buildSavedStateKey(designFactor, actorSide) : undefined,
     };
   } catch (error) {
     console.error(`Error saving ${designFactor} assessment:`, error);
@@ -1170,6 +1177,42 @@ function buildSubmissionUpdate(
 }
 
 const DESIGN_FACTORS = ["DF01", "DF02", "DF03", "DF04", "DF05", "DF06", "DF07", "DF08", "DF09", "DF10"] as const;
+
+function readSavedState(savedState: unknown) {
+  if (!savedState || typeof savedState !== "object" || Array.isArray(savedState)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(savedState as Record<string, unknown>).map(([key, value]) => [key, Boolean(value)]),
+  ) as Record<string, boolean>;
+}
+
+function buildSavedStateKey(designFactor: string, actorSide: SubmissionSide) {
+  return `${designFactor.toLowerCase()}${actorSide === "AUDITEE" ? "Auditee" : "Auditor"}Saved`;
+}
+
+function buildSavedStateUpdate(
+  savedState: unknown,
+  designFactor: string,
+  actorSide: SubmissionSide,
+  isSubmitAll: boolean,
+) {
+  if (actorSide === "ADMIN") {
+    return {};
+  }
+
+  const nextState = readSavedState(savedState);
+  if (isSubmitAll) {
+    for (const factor of DESIGN_FACTORS) {
+      nextState[buildSavedStateKey(factor, actorSide)] = true;
+    }
+  } else {
+    nextState[buildSavedStateKey(designFactor, actorSide)] = true;
+  }
+
+  return { savedState: nextState as Prisma.InputJsonObject };
+}
 
 function buildAllSubmissionUpdate(assessment: SubmissionState, actorSide: SubmissionSide) {
   if (actorSide === "ADMIN") {

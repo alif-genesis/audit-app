@@ -1,0 +1,185 @@
+{
+  "node": {
+    "000018f6f6090996220c071045c6d90e9e907a1abc": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "hasActiveSession",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "hasActiveSession",
+      "filename": "app/login/actions.ts"
+    },
+    "001ed11d395b3b9065ab27f1a6bd47681857fe7003": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "userCanAccessAdminArea",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "userCanAccessAdminArea",
+      "filename": "app/login/actions.ts"
+    },
+    "00337adbb1b299c8500672a3ac3b3389548418c7a0": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "logoutAction",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "logoutAction",
+      "filename": "app/login/actions.ts"
+    },
+    "00461e60e5256eb1f1c4bb076906ad344e299df3ca": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "hasAdminSession",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "hasAdminSession",
+      "filename": "app/login/actions.ts"
+    },
+    "00c64cf8e2fb8aeccfaa63e5c08ad472aa69dceb6d": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "getSessionUser",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "getSessionUser",
+      "filename": "app/login/actions.ts"
+    },
+    "60c38c8f902d56e7d6054d07c5fec61713ed3ff744": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "loginAction",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "exportedName": "loginAction",
+      "filename": "app/login/actions.ts"
+    },
+    "6040fcb06b0574a55be74fe309e03cdda4b8581367": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "changePasswordAction",
+          "filename": "app/profile/actions.ts"
+        }
+      },
+      "exportedName": "changePasswordAction",
+      "filename": "app/profile/actions.ts"
+    },
+    "60418731b11456bdfe0df943be0c850c9b535a7590": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "updateProfileAction",
+          "filename": "app/profile/actions.ts"
+        }
+      },
+      "exportedName": "updateProfileAction",
+      "filename": "app/profile/actions.ts"
+    },
+    "4059bb016064b0513c7d07da54378a67dde1f82ac8": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "createAuditTypeAction",
+          "filename": "app/dashboard/audit-types/actions.ts"
+        }
+      },
+      "exportedName": "createAuditTypeAction",
+      "filename": "app/dashboard/audit-types/actions.ts"
+    },
+    "40659c2ecc0d48a42ce9922338133a3da553c412d9": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "deleteAuditTypeAction",
+          "filename": "app/dashboard/audit-types/actions.ts"
+        }
+      },
+      "exportedName": "deleteAuditTypeAction",
+      "filename": "app/dashboard/audit-types/actions.ts"
+    },
+    "40a01f5de4ee2d3754d233059d2fc3acd123882eb9": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "deleteAuditQuestionAction",
+          "filename": "app/dashboard/audit-types/actions.ts"
+        }
+      },
+      "exportedName": "deleteAuditQuestionAction",
+      "filename": "app/dashboard/audit-types/actions.ts"
+    },
+    "6009a71c610410748fd95d5a07fe26f5ebbf30b56b": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "addAuditQuestionAction",
+          "filename": "app/dashboard/audit-types/actions.ts"
+        }
+      },
+      "exportedName": "addAuditQuestionAction",
+      "filename": "app/dashboard/audit-types/actions.ts"
+    },
+    "60114ca63a0334c0a667bbf633d07184952f640864": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "updateAuditQuestionAction",
+          "filename": "app/dashboard/audit-types/actions.ts"
+        }
+      },
+      "exportedName": "updateAuditQuestionAction",
+      "filename": "app/dashboard/audit-types/actions.ts"
+    },
+    "606916a03b79beba7a753fc3d3aa8af71c460088da": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "uploadAuditQuestionsAction",
+          "filename": "app/dashboard/audit-types/actions.ts"
+        }
+      },
+      "exportedName": "uploadAuditQuestionsAction",
+      "filename": "app/dashboard/audit-types/actions.ts"
+    },
+    "6071b2c4d6f889b58979e3fa93efb7145cbff919bd": {
+      "workers": {
+        "app/dashboard/audit-types/new/page": {
+          "moduleId": 87788,
+          "async": false,
+          "exportedName": "updateAuditTypeAction",
+          "filename": "app/dashboard/audit-types/actions.ts"
+        }
+      },
+      "exportedName": "updateAuditTypeAction",
+      "filename": "app/dashboard/audit-types/actions.ts"
+    }
+  },
+  "edge": {}
+}

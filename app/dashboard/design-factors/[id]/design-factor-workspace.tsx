@@ -1,5 +1,6 @@
 "use client";
 
+import type { Dispatch, SetStateAction } from "react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Download, Save, Send } from "lucide-react";
@@ -47,6 +48,7 @@ type ActiveFactor = "DF01" | "DF02" | "DF03" | "DF04" | "DF05" | "DF06" | "DF07"
 type ActiveTab = ActiveFactor | "SUMMARY";
 type InputRow = Df01InputRow | Df02InputRow | Df04InputRow | Df05InputRow | Df06InputRow | Df07InputRow | Df08InputRow | Df09InputRow | Df10InputRow;
 type ChartRow = InputRow | { key: string; label: string; importance: number; baseline: number };
+type SaveState = Record<string, boolean>;
 
 type SubmitState = {
   df01AuditeeSubmitted: boolean;
@@ -87,6 +89,7 @@ type DesignFactorWorkspaceProps = {
   initialDf10Rows: Df10InputRow[];
   userSide: UserSide;
   submitState: SubmitState;
+  saveState: SaveState;
   canEdit: boolean;
 };
 
@@ -163,6 +166,7 @@ export function DesignFactorWorkspace({
   initialDf10Rows,
   userSide,
   submitState,
+  saveState: initialSaveState,
   canEdit,
 }: DesignFactorWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("DF01");
@@ -179,6 +183,7 @@ export function DesignFactorWorkspace({
   const [df09Rows, setDf09Rows] = useState(initialDf09Rows.length ? initialDf09Rows : defaultDf09Rows());
   const [df10Rows, setDf10Rows] = useState(initialDf10Rows.length ? initialDf10Rows : defaultDf10Rows());
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>(initialSaveState);
   const [state, formAction] = useActionState(saveDf01AssessmentAction, initialState);
   const activeFactor: ActiveFactor = activeTab === "SUMMARY" ? "DF01" : activeTab;
   const visitedStorageKey = `design-factor:${assessmentId}:visited-factors`;
@@ -218,7 +223,10 @@ export function DesignFactorWorkspace({
     if (state.toast?.type === "success") {
       setHasUnsavedChanges(false);
     }
-  }, [state.toast]);
+    if (state.savedKey) {
+      setSaveState((current) => ({ ...current, [state.savedKey as string]: true }));
+    }
+  }, [state.savedKey, state.toast]);
   const allSubmitted = tabs
     .filter((tab): tab is ActiveFactor => tab !== "SUMMARY")
     .every((factor) => {
@@ -344,6 +352,7 @@ export function DesignFactorWorkspace({
   const canEditImportance = canEdit && isAvailable && userSide === "AUDITEE" && !auditeeSubmitted;
   const canEditBaseline = canEdit && isAvailable && userSide === "AUDITOR" && !auditorSubmitted;
   const canSubmit = isAvailable && (userSide === "AUDITEE" || userSide === "AUDITOR") && !currentSideSubmitted;
+  const currentFactorSaved = isFactorSaved(activeFactor, userSide, saveState);
   const barRows =
     activeFactor === "DF03"
       ? df03Rows.map((row) => ({
@@ -360,6 +369,7 @@ export function DesignFactorWorkspace({
     }
 
     setHasUnsavedChanges(true);
+    markFactorUnsaved(activeFactor, userSide, setSaveState);
     const isPercentageFactor =
       activeFactor === "DF05" ||
       activeFactor === "DF06" ||
@@ -500,6 +510,7 @@ export function DesignFactorWorkspace({
     }
 
     setHasUnsavedChanges(true);
+    markFactorUnsaved(activeFactor, userSide, setSaveState);
     const max = field === "baseline" ? 25 : 5;
     const min = 0;
     const numericValue = Math.min(max, Math.max(min, Number(value || min)));
@@ -564,7 +575,9 @@ export function DesignFactorWorkspace({
       <div className="df-tabs" role="tablist" aria-label="Design Factors">
         {tabs.map((tab) => (
           <button
-            className={`df-tab ${activeTab === tab ? "active" : ""}`}
+            className={`df-tab ${activeTab === tab ? "active" : ""} ${
+              tab !== "SUMMARY" && isFactorSaved(tab, userSide, saveState) ? "saved" : ""
+            }`}
             key={tab}
             type="button"
             aria-selected={activeTab === tab}
@@ -630,7 +643,13 @@ export function DesignFactorWorkspace({
                 </div>
                 {userSide === "AUDITEE" || userSide === "AUDITOR" ? (
                   <div className="submit-split-actions df-top-actions">
-                    <DfSubmitButton disabled={!canEditImportance && !canEditBaseline} intent="save" label="Save Assessment" pendingLabel="Menyimpan..." />
+                    <DfSubmitButton
+                      disabled={!canEditImportance && !canEditBaseline}
+                      intent="save"
+                      label={currentFactorSaved ? "Saved" : "Save Assessment"}
+                      pendingLabel="Menyimpan..."
+                      saved={currentFactorSaved}
+                    />
                     <DfSubmitButton
                       disabled={!canSubmit}
                       intent="submitAll"
@@ -1623,6 +1642,7 @@ function DfSubmitButton({
   label,
   pendingLabel,
   disabled,
+  saved,
   confirmMessage,
   validateBeforeConfirm,
 }: {
@@ -1630,6 +1650,7 @@ function DfSubmitButton({
   label: string;
   pendingLabel: string;
   disabled: boolean;
+  saved?: boolean;
   confirmMessage?: string;
   validateBeforeConfirm?: () => string | null;
 }) {
@@ -1638,7 +1659,7 @@ function DfSubmitButton({
 
   return (
     <button
-      className={intent === "submit" || intent === "submitAll" ? "primary-button" : "secondary-button"}
+      className={intent === "submit" || intent === "submitAll" ? "primary-button" : `secondary-button${saved ? " saved" : ""}`}
       name="intent"
       value={intent}
       type="submit"
@@ -1660,6 +1681,38 @@ function DfSubmitButton({
       {pending ? pendingLabel : label}
     </button>
   );
+}
+
+function getSaveStateKey(factor: ActiveFactor, side: UserSide) {
+  if (side !== "AUDITEE" && side !== "AUDITOR") {
+    return null;
+  }
+
+  return `${factor.toLowerCase()}${side === "AUDITEE" ? "Auditee" : "Auditor"}Saved`;
+}
+
+function isFactorSaved(factor: ActiveFactor, side: UserSide, saveState: SaveState) {
+  if (side === "ADMIN") {
+    const auditeeKey = `${factor.toLowerCase()}AuditeeSaved`;
+    const auditorKey = `${factor.toLowerCase()}AuditorSaved`;
+    return Boolean(saveState[auditeeKey] || saveState[auditorKey]);
+  }
+
+  const key = getSaveStateKey(factor, side);
+  return key ? Boolean(saveState[key]) : false;
+}
+
+function markFactorUnsaved(
+  factor: ActiveFactor,
+  side: UserSide,
+  setSaveState: Dispatch<SetStateAction<SaveState>>,
+) {
+  const key = getSaveStateKey(factor, side);
+  if (!key) {
+    return;
+  }
+
+  setSaveState((current) => ({ ...current, [key]: false }));
 }
 
 function formatNumber(value: number) {

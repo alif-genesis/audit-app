@@ -1,5 +1,18 @@
 {
-  "node": {},
+  "node": {
+    "60034e1f38d086490be09718e269b1c99828390cb0": {
+      "workers": {
+        "app/login/page": {
+          "moduleId": "[project]/.next-internal/server/app/login/page/actions.js { ACTIONS_MODULE0 => \"[project]/app/login/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false,
+          "exportedName": "loginAction",
+          "filename": "app/login/actions.ts"
+        }
+      },
+      "filename": "app/login/actions.ts",
+      "exportedName": "loginAction"
+    }
+  },
   "edge": {},
   "encryptionKey": "nhmA+tdmuZZesgwQNtbyXUWdqDeH02eXqX2zmd4RJoI="
 }

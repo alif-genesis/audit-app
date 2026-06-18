@@ -1118,10 +1118,23 @@ function calculateWeightedFactorResults<T extends string>(
   rows: Array<{ key: T; importance: number; baseline: number }>,
   matrix: Record<T, Record<CobitObjective, number>>,
 ): ObjectiveCalculation[] {
+  const normalizedRows = rows.map((row) => ({
+    ...row,
+    importance: clampScore(Number(row.importance)),
+    baseline: clampScore(Number(row.baseline)),
+  }));
+  const averageImportance =
+    normalizedRows.reduce((sum, row) => sum + row.importance, 0) / Math.max(normalizedRows.length, 1);
+  const averageBaseline =
+    normalizedRows.reduce((sum, row) => sum + row.baseline, 0) / Math.max(normalizedRows.length, 1);
+
   return cobitObjectives.map((objective) => {
-    const score = rows.reduce((sum, row) => sum + matrix[row.key][objective] * clampScore(Number(row.importance)), 0);
-    const baselineScore = rows.reduce((sum, row) => sum + matrix[row.key][objective] * clampScore(Number(row.baseline)), 0);
-    const relativeImportance = baselineScore === 0 ? 0 : mround((100 * score) / baselineScore, 5) - 100;
+    const score = normalizedRows.reduce((sum, row) => sum + matrix[row.key][objective] * row.importance, 0);
+    const baselineScore = normalizedRows.reduce((sum, row) => sum + matrix[row.key][objective] * row.baseline, 0);
+    const relativeImportance =
+      baselineScore === 0 || averageImportance === 0
+        ? 0
+        : mround((averageBaseline / averageImportance) * 100 * (score / baselineScore), 5) - 100;
 
     return {
       objective,

@@ -1069,6 +1069,12 @@ select:disabled {
   white-space: nowrap;
 }
 
+.secondary-button.saved {
+  color: #0d6b3c;
+  background: #dff8e9;
+  box-shadow: inset 0 0 0 1px #9ed9b8;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1.5px solid #c6d7ee;
@@ -2351,6 +2357,12 @@ select:disabled {
   border-color: transparent;
   background: linear-gradient(135deg, #1768d4 0%, #0497b1 64%, #6fb51d 100%);
   box-shadow: 0 10px 20px rgba(21, 91, 214, 0.18);
+}
+
+.df-tab.saved:not(.active) {
+  color: #0d6b3c;
+  border-color: #9ed9b8;
+  background: #dff8e9;
 }
 
 .df-workspace-form {

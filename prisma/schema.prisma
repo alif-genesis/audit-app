@@ -372,6 +372,7 @@ model DesignFactorAssessment {
   approvedAt DateTime? @map("approved_at")
   approvedById String? @map("approved_by_id")
   approvalNote String? @map("approval_note")
+  savedState Json @default("{}") @map("saved_state")
   df01AuditeeSubmittedAt DateTime? @map("df01_auditee_submitted_at")
   df01AuditorSubmittedAt DateTime? @map("df01_auditor_submitted_at")
   df02AuditeeSubmittedAt DateTime? @map("df02_auditee_submitted_at")
