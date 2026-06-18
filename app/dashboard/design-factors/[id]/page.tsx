@@ -206,7 +206,10 @@ function parseDesignFactorSaveState(savedState: unknown) {
   }
 
   return Object.fromEntries(
-    Object.entries(savedState as Record<string, unknown>).map(([key, value]) => [key, Boolean(value)]),
+    Object.entries(savedState as Record<string, unknown>).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value.map(String) : Boolean(value),
+    ]),
   );
 }
 

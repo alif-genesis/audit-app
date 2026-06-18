@@ -32,7 +32,7 @@ import {
   type Df09InputRow,
   type Df10InputRow,
   type ObjectiveCalculation,
-} from "@/lib/cobit/designFactorMatrix";
+} from "./designFactorMatrix";
 
 export type CobitAuditScope = "ALL_40" | "BUMN_24" | "DESIGN_FACTOR";
 

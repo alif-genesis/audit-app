@@ -61,6 +61,19 @@ function parseDate(value: FormDataEntryValue | null) {
   return raw ? new Date(raw) : null;
 }
 
+function parseFilledFields(value: FormDataEntryValue | null) {
+  try {
+    const parsed = JSON.parse(String(value || "[]"));
+    return Array.isArray(parsed)
+      ? parsed
+          .map((item) => String(item))
+          .filter((item) => /^[A-Za-z0-9_]+[.][A-Za-z]+$/.test(item))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 async function assertAssignedUser(userId: string, role: "AUDITOR" | "AUDITEE") {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -340,6 +353,7 @@ export async function saveDf01AssessmentAction(
 
   const assessmentId = String(formData.get("assessmentId") || "").trim();
   const rowsRaw = String(formData.get("df01Rows") || "[]");
+  const filledFields = parseFilledFields(formData.get("filledFields"));
   const intent = String(formData.get("intent") || "save");
 
   if (!assessmentId) {
@@ -465,6 +479,28 @@ export async function saveDf01AssessmentAction(
 
   if (isSubmitAll) {
     const rowsByFactor = getSubmissionRowsByFactor(assessment, designFactor, normalizedRows, actorSide);
+    const unsavedFactor = DESIGN_FACTORS.find((factor) => !isSavedForSubmission(assessment, factor, actorSide));
+    if (unsavedFactor) {
+      return {
+        toast: {
+          type: "error",
+          message: `${actorSide === "AUDITEE" ? "Auditee" : "Auditor"} wajib menyimpan ${unsavedFactor} sebelum submit final.`,
+        },
+      };
+    }
+
+    const unfilledFactor = DESIGN_FACTORS.find((factor) =>
+      !hasSavedRequiredFields(assessment, factor, rowsByFactor[factor], actorSide),
+    );
+    if (unfilledFactor) {
+      return {
+        toast: {
+          type: "error",
+          message: `${actorSide === "AUDITEE" ? "Auditee" : "Auditor"} wajib mengisi dan menyimpan semua field ${unfilledFactor} sebelum submit final.`,
+        },
+      };
+    }
+
     const incompleteFactor = DESIGN_FACTORS.find((factor) =>
       Boolean(validateSubmissionRows(factor, rowsByFactor[factor], actorSide)),
     );
@@ -627,7 +663,7 @@ export async function saveDf01AssessmentAction(
           ...(isSubmitAll
             ? buildAllSubmissionUpdate(assessment, actorSide)
             : buildSubmissionUpdate(assessment, designFactor, actorSide, isSubmit)),
-          ...buildSavedStateUpdate(assessment.savedState, designFactor, actorSide, isSubmitAll),
+          ...buildSavedStateUpdate(assessment.savedState, designFactor, actorSide, isSubmitAll, filledFields),
         },
       });
     });
@@ -1100,6 +1136,58 @@ function isAlreadySubmitted(assessment: SubmissionState, designFactor: string, a
   return Boolean(assessment[key as keyof SubmissionState]);
 }
 
+function isSavedForSubmission(
+  assessment: SubmissionState & { savedState?: unknown },
+  designFactor: string,
+  actorSide: SubmissionSide,
+) {
+  if (actorSide === "ADMIN") {
+    return true;
+  }
+
+  if (isAlreadySubmitted(assessment, designFactor, actorSide)) {
+    return true;
+  }
+
+  const savedState = readSavedState(assessment.savedState);
+  return Boolean(savedState[buildSavedStateKey(designFactor, actorSide)]);
+}
+
+function hasSavedRequiredFields(
+  assessment: SubmissionState & { savedState?: unknown },
+  designFactor: string,
+  rows: unknown,
+  actorSide: SubmissionSide,
+) {
+  if (actorSide === "ADMIN" || isAlreadySubmitted(assessment, designFactor, actorSide)) {
+    return true;
+  }
+
+  const savedState = readSavedState(assessment.savedState);
+  const savedFields = savedState[buildFilledFieldsKey(designFactor, actorSide)];
+  if (!Array.isArray(savedFields)) {
+    return true;
+  }
+
+  const rowList = Array.isArray(rows) ? rows : [];
+  const requiredFields =
+    actorSide === "AUDITEE"
+      ? designFactor === "DF03"
+        ? ["impact", "likelihood"]
+        : ["importance"]
+      : ["baseline"];
+  const saved = new Set(savedFields);
+
+  return rowList.every((row) => {
+    if (!row || typeof row !== "object") {
+      return false;
+    }
+
+    const rowKey = String((row as Record<string, unknown>).key ?? "");
+    return rowKey ? requiredFields.every((field) => saved.has(`${rowKey}.${field}`)) : false;
+  });
+}
+
 function buildSubmissionUpdate(
   assessment: SubmissionState,
   designFactor: string,
@@ -1184,12 +1272,19 @@ function readSavedState(savedState: unknown) {
   }
 
   return Object.fromEntries(
-    Object.entries(savedState as Record<string, unknown>).map(([key, value]) => [key, Boolean(value)]),
-  ) as Record<string, boolean>;
+    Object.entries(savedState as Record<string, unknown>).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value.map(String) : Boolean(value),
+    ]),
+  ) as Record<string, boolean | string[]>;
 }
 
 function buildSavedStateKey(designFactor: string, actorSide: SubmissionSide) {
   return `${designFactor.toLowerCase()}${actorSide === "AUDITEE" ? "Auditee" : "Auditor"}Saved`;
+}
+
+function buildFilledFieldsKey(designFactor: string, actorSide: SubmissionSide) {
+  return `${designFactor.toLowerCase()}${actorSide === "AUDITEE" ? "Auditee" : "Auditor"}FilledFields`;
 }
 
 function buildSavedStateUpdate(
@@ -1197,12 +1292,17 @@ function buildSavedStateUpdate(
   designFactor: string,
   actorSide: SubmissionSide,
   isSubmitAll: boolean,
+  filledFields: string[],
 ) {
   if (actorSide === "ADMIN") {
     return {};
   }
 
   const nextState = readSavedState(savedState);
+  const filledFieldsKey = buildFilledFieldsKey(designFactor, actorSide);
+  const existingFields = Array.isArray(nextState[filledFieldsKey]) ? nextState[filledFieldsKey] : [];
+  nextState[filledFieldsKey] = Array.from(new Set([...existingFields, ...filledFields]));
+
   if (isSubmitAll) {
     for (const factor of DESIGN_FACTORS) {
       nextState[buildSavedStateKey(factor, actorSide)] = true;
@@ -1286,6 +1386,7 @@ function validateSubmissionRows(designFactor: string, rows: unknown, actorSide: 
         ? ["impact", "likelihood"]
         : ["importance"]
       : ["baseline"];
+  const zeroIsValid = isPercentageDesignFactor(designFactor);
 
   const incompleteRow = rowList.find((row) => {
     if (!row || typeof row !== "object") {
@@ -1294,7 +1395,7 @@ function validateSubmissionRows(designFactor: string, rows: unknown, actorSide: 
 
     return requiredFields.length > 0 && requiredFields.some((field) => {
       const value = Number((row as Record<string, unknown>)[field]);
-      return !Number.isFinite(value) || value <= 0;
+      return !Number.isFinite(value) || (zeroIsValid ? value < 0 : value <= 0);
     });
   });
 
@@ -1303,6 +1404,10 @@ function validateSubmissionRows(designFactor: string, rows: unknown, actorSide: 
   }
 
   return null;
+}
+
+function isPercentageDesignFactor(designFactor: string) {
+  return designFactor === "DF05" || designFactor === "DF06" || designFactor === "DF08" || designFactor === "DF09" || designFactor === "DF10";
 }
 
 function rowsToDf01Data(rows: Df01InputRow[]) {

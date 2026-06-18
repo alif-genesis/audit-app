@@ -10,7 +10,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "df:resync": "tsc -p tsconfig.scripts.json && node .script-build/scripts/resync-design-factor-audits.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

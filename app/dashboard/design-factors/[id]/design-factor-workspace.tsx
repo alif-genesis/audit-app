@@ -48,7 +48,7 @@ type ActiveFactor = "DF01" | "DF02" | "DF03" | "DF04" | "DF05" | "DF06" | "DF07"
 type ActiveTab = ActiveFactor | "SUMMARY";
 type InputRow = Df01InputRow | Df02InputRow | Df04InputRow | Df05InputRow | Df06InputRow | Df07InputRow | Df08InputRow | Df09InputRow | Df10InputRow;
 type ChartRow = InputRow | { key: string; label: string; importance: number; baseline: number };
-type SaveState = Record<string, boolean>;
+type SaveState = Record<string, boolean | string[]>;
 
 type SubmitState = {
   df01AuditeeSubmitted: boolean;
@@ -184,6 +184,7 @@ export function DesignFactorWorkspace({
   const [df10Rows, setDf10Rows] = useState(initialDf10Rows.length ? initialDf10Rows : defaultDf10Rows());
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>(initialSaveState);
+  const [touchedFields, setTouchedFields] = useState<string[]>([]);
   const [state, formAction] = useActionState(saveDf01AssessmentAction, initialState);
   const activeFactor: ActiveFactor = activeTab === "SUMMARY" ? "DF01" : activeTab;
   const visitedStorageKey = `design-factor:${assessmentId}:visited-factors`;
@@ -370,6 +371,7 @@ export function DesignFactorWorkspace({
 
     setHasUnsavedChanges(true);
     markFactorUnsaved(activeFactor, userSide, setSaveState);
+    markFieldTouched(activeFactor, key, field, setTouchedFields);
     const isPercentageFactor =
       activeFactor === "DF05" ||
       activeFactor === "DF06" ||
@@ -511,6 +513,7 @@ export function DesignFactorWorkspace({
 
     setHasUnsavedChanges(true);
     markFactorUnsaved(activeFactor, userSide, setSaveState);
+    markFieldTouched(activeFactor, key, field, setTouchedFields);
     const max = field === "baseline" ? 25 : 5;
     const min = 0;
     const numericValue = Math.min(max, Math.max(min, Number(value || min)));
@@ -547,6 +550,11 @@ export function DesignFactorWorkspace({
     const incompleteFactor = tabs
       .filter((tab): tab is ActiveFactor => tab !== "SUMMARY")
       .find((factor) => {
+        if (!isFactorReadyForSubmit(factor, userSide, saveState, submitState)) {
+          return true;
+        }
+
+        const zeroIsValid = isPercentageFactor(factor);
         const requiredFields =
           userSide === "AUDITEE"
             ? factor === "DF03"
@@ -556,9 +564,9 @@ export function DesignFactorWorkspace({
         return allRowsByFactor[factor].some((row) =>
           requiredFields.some((field) => {
             const value = Number(row[field]);
-            return !Number.isFinite(value) || value <= 0;
+            return !Number.isFinite(value) || (zeroIsValid ? value < 0 : value <= 0);
           }),
-        );
+        ) || !isSavedFieldSetComplete(factor, userSide, saveState, allRowsByFactor[factor], requiredFields);
       });
 
     if (incompleteFactor) {
@@ -617,6 +625,7 @@ export function DesignFactorWorkspace({
           <input name="assessmentId" type="hidden" value={assessmentId} />
           <input name="designFactor" type="hidden" value={activeFactor} />
           <input name="df01Rows" type="hidden" value={JSON.stringify(activeRows)} />
+          <input name="filledFields" type="hidden" value={JSON.stringify(getActiveTouchedFields(activeFactor, touchedFields))} />
 
           <section className="users-panel df-panel">
             <div className="section-heading">
@@ -1591,6 +1600,10 @@ function getFactorTitle(activeFactor: ActiveFactor) {
   return "DF01 - Enterprise Strategy";
 }
 
+function isPercentageFactor(factor: ActiveFactor | string) {
+  return factor === "DF05" || factor === "DF06" || factor === "DF08" || factor === "DF09" || factor === "DF10";
+}
+
 function getRiskLevel(score: number) {
   if (score >= 15) {
     return { label: "Very High Risk", className: "very-high" };
@@ -1702,6 +1715,57 @@ function isFactorSaved(factor: ActiveFactor, side: UserSide, saveState: SaveStat
   return key ? Boolean(saveState[key]) : false;
 }
 
+function isFactorSubmitted(factor: ActiveFactor, side: UserSide, submitState: SubmitState) {
+  if (side !== "AUDITEE" && side !== "AUDITOR") {
+    return false;
+  }
+
+  const prefix = factor.toLowerCase();
+  const key = `${prefix}${side === "AUDITEE" ? "Auditee" : "Auditor"}Submitted` as keyof SubmitState;
+  return Boolean(submitState[key]);
+}
+
+function isFactorReadyForSubmit(
+  factor: ActiveFactor,
+  side: UserSide,
+  saveState: SaveState,
+  submitState: SubmitState,
+) {
+  return isFactorSaved(factor, side, saveState) || isFactorSubmitted(factor, side, submitState);
+}
+
+function getFilledFieldsKey(factor: ActiveFactor | string, side: UserSide) {
+  if (side !== "AUDITEE" && side !== "AUDITOR") {
+    return null;
+  }
+
+  return `${factor.toLowerCase()}${side === "AUDITEE" ? "Auditee" : "Auditor"}FilledFields`;
+}
+
+function isSavedFieldSetComplete(
+  factor: ActiveFactor,
+  side: UserSide,
+  saveState: SaveState,
+  rows: Array<Record<string, unknown>>,
+  requiredFields: string[],
+) {
+  if (side !== "AUDITEE" && side !== "AUDITOR") {
+    return false;
+  }
+
+  const key = getFilledFieldsKey(factor, side);
+  const savedFields = key ? saveState[key] : null;
+  if (!Array.isArray(savedFields)) {
+    return true;
+  }
+
+  const saved = new Set(savedFields);
+  return rows.every((row) => {
+    const rowKey = String(row.key ?? "");
+    return rowKey ? requiredFields.every((field) => saved.has(`${rowKey}.${field}`)) : false;
+  });
+}
+
 function markFactorUnsaved(
   factor: ActiveFactor,
   side: UserSide,
@@ -1713,6 +1777,23 @@ function markFactorUnsaved(
   }
 
   setSaveState((current) => ({ ...current, [key]: false }));
+}
+
+function markFieldTouched(
+  factor: ActiveFactor,
+  rowKey: string,
+  field: string,
+  setTouchedFields: Dispatch<SetStateAction<string[]>>,
+) {
+  const key = `${factor}.${rowKey}.${field}`;
+  setTouchedFields((current) => (current.includes(key) ? current : [...current, key]));
+}
+
+function getActiveTouchedFields(factor: ActiveFactor, touchedFields: string[]) {
+  const prefix = `${factor}.`;
+  return touchedFields
+    .filter((field) => field.startsWith(prefix))
+    .map((field) => field.slice(prefix.length));
 }
 
 function formatNumber(value: number) {
