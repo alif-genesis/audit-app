@@ -554,19 +554,16 @@ export function DesignFactorWorkspace({
           return true;
         }
 
-        const zeroIsValid = isPercentageFactor(factor);
         const requiredFields =
           userSide === "AUDITEE"
             ? factor === "DF03"
               ? ["impact", "likelihood"]
               : ["importance"]
             : ["baseline"];
-        return allRowsByFactor[factor].some((row) =>
-          requiredFields.some((field) => {
-            const value = Number(row[field]);
-            return !Number.isFinite(value) || (zeroIsValid ? value < 0 : value <= 0);
-          }),
-        ) || !isSavedFieldSetComplete(factor, userSide, saveState, allRowsByFactor[factor], requiredFields);
+        return (
+          !hasValidSubmissionValues(factor, userSide, allRowsByFactor[factor], requiredFields) ||
+          !isSavedFieldSetComplete(factor, userSide, saveState, allRowsByFactor[factor], requiredFields)
+        );
       });
 
     if (incompleteFactor) {
@@ -1762,8 +1759,36 @@ function isSavedFieldSetComplete(
   const saved = new Set(savedFields);
   return rows.every((row) => {
     const rowKey = String(row.key ?? "");
-    return rowKey ? requiredFields.every((field) => saved.has(`${rowKey}.${field}`)) : false;
+    if (!rowKey) {
+      return false;
+    }
+
+    const savedEveryField = requiredFields.every((field) => saved.has(`${rowKey}.${field}`));
+    if (savedEveryField) {
+      return true;
+    }
+
+    return hasValidSubmissionValues(factor, side, [row], requiredFields);
   });
+}
+
+function hasValidSubmissionValues(
+  factor: ActiveFactor,
+  side: UserSide,
+  rows: Array<Record<string, unknown>>,
+  requiredFields: string[],
+) {
+  if (side !== "AUDITEE" && side !== "AUDITOR") {
+    return false;
+  }
+
+  const zeroIsValid = isPercentageFactor(factor);
+  return rows.every((row) =>
+    requiredFields.every((field) => {
+      const value = Number(row[field]);
+      return Number.isFinite(value) && (zeroIsValid ? value >= 0 : value > 0);
+    }),
+  );
 }
 
 function markFactorUnsaved(

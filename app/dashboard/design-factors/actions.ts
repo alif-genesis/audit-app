@@ -1184,7 +1184,16 @@ function hasSavedRequiredFields(
     }
 
     const rowKey = String((row as Record<string, unknown>).key ?? "");
-    return rowKey ? requiredFields.every((field) => saved.has(`${rowKey}.${field}`)) : false;
+    if (!rowKey) {
+      return false;
+    }
+
+    const savedEveryField = requiredFields.every((field) => saved.has(`${rowKey}.${field}`));
+    if (savedEveryField) {
+      return true;
+    }
+
+    return hasValidSubmissionValues(designFactor, [row], actorSide);
   });
 }
 
@@ -1388,22 +1397,34 @@ function validateSubmissionRows(designFactor: string, rows: unknown, actorSide: 
       : ["baseline"];
   const zeroIsValid = isPercentageDesignFactor(designFactor);
 
-  const incompleteRow = rowList.find((row) => {
-    if (!row || typeof row !== "object") {
-      return true;
-    }
-
-    return requiredFields.length > 0 && requiredFields.some((field) => {
-      const value = Number((row as Record<string, unknown>)[field]);
-      return !Number.isFinite(value) || (zeroIsValid ? value < 0 : value <= 0);
-    });
-  });
+  const incompleteRow = rowList.find((row) => !hasValidSubmissionValues(designFactor, [row], actorSide));
 
   if (incompleteRow) {
     return `${actorSide === "AUDITEE" ? "Auditee" : "Auditor"} wajib melengkapi semua isian ${designFactor} sebelum submit.`;
   }
 
   return null;
+}
+
+function hasValidSubmissionValues(designFactor: string, rows: unknown[], actorSide: SubmissionSide) {
+  const requiredFields =
+    actorSide === "AUDITEE"
+      ? designFactor === "DF03"
+        ? ["impact", "likelihood"]
+        : ["importance"]
+      : ["baseline"];
+  const zeroIsValid = isPercentageDesignFactor(designFactor);
+
+  return rows.every((row) => {
+    if (!row || typeof row !== "object") {
+      return false;
+    }
+
+    return requiredFields.every((field) => {
+      const value = Number((row as Record<string, unknown>)[field]);
+      return Number.isFinite(value) && (zeroIsValid ? value >= 0 : value > 0);
+    });
+  });
 }
 
 function isPercentageDesignFactor(designFactor: string) {
