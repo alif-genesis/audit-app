@@ -1,0 +1,14 @@
+<svg width="220" height="72" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">COBIT 2019</title>
+  <desc id="desc">COBIT 2019 wordmark for Design Factors pages.</desc>
+  <rect width="220" height="72" rx="10" fill="#ffffff"/>
+  <text x="12" y="48" fill="#064a86" font-family="Arial, Helvetica, sans-serif" font-size="43" font-weight="800" letter-spacing="0">C</text>
+  <g transform="translate(43 15)">
+    <circle cx="21" cy="21" r="18" fill="none" stroke="#b90056" stroke-width="8"/>
+    <path d="M21 30L37 46L40 25L21 30Z" fill="#b90056"/>
+    <circle cx="21" cy="21" r="10" fill="#ffffff"/>
+  </g>
+  <text x="86" y="48" fill="#064a86" font-family="Arial, Helvetica, sans-serif" font-size="43" font-weight="800" letter-spacing="0">BIT</text>
+  <text x="154" y="49" fill="#b90056" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" letter-spacing="0">2019</text>
+  <text x="197" y="22" fill="#064a86" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">R</text>
+</svg>

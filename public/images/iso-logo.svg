@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" role="img" aria-label="ISO">
+  <g fill="none" stroke="#050505" stroke-width="10" stroke-linecap="round">
+    <path d="M28 58C72 7 168 7 212 58"/>
+    <path d="M28 122c44 51 140 51 184 0"/>
+    <path d="M58 58c24-34 48-47 62-47s38 13 62 47"/>
+    <path d="M58 122c24 34 48 47 62 47s38-13 62-47"/>
+    <path d="M94 58c8-34 17-47 26-47s18 13 26 47"/>
+    <path d="M94 122c8 34 17 47 26 47s18-13 26-47"/>
+  </g>
+  <text
+    x="120"
+    y="121"
+    fill="#050505"
+    font-family="Arial Black, Arial, Helvetica, sans-serif"
+    font-size="92"
+    font-weight="900"
+    text-anchor="middle"
+    letter-spacing="-5"
+  >ISO</text>
+</svg>
