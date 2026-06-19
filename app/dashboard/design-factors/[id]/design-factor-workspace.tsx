@@ -1305,25 +1305,28 @@ function buildSummaryRows(results: FactorResultMap): SummaryRow[] {
           results[factor].find((result) => result.objective === objective)?.relativeImportance ?? 0,
         ]),
     ) as Record<ActiveFactor, number>;
-    const initialScope = df.DF01 + df.DF02 + df.DF03 + df.DF04;
+    const initialRawScore = df.DF01 + df.DF02 + df.DF03 + df.DF04;
     const adjustment = 0;
     const rawScore =
-      initialScope + df.DF05 + df.DF06 + df.DF07 + df.DF08 + df.DF09 + df.DF10 + adjustment;
+      initialRawScore + df.DF05 + df.DF06 + df.DF07 + df.DF08 + df.DF09 + df.DF10 + adjustment;
 
     return {
       objective,
       domainName: objectiveNames[objective] ?? objective,
       df,
-      initialScope,
+      initialRawScore,
       adjustment,
       rawScore,
     };
   });
+  const maxInitialRawScore = Math.max(...rawRows.map((row) => row.initialRawScore));
   const maxScore = Math.max(...rawRows.map((row) => row.rawScore), 1);
   const withPriority = rawRows.map((row) => {
+    const initialScope = normalizeCobitRelativeScore(row.initialRawScore, maxInitialRawScore);
     const priorityScore = Math.max(0, Math.round(Math.trunc((row.rawScore / maxScore) * 100) / 5) * 5);
     return {
       ...row,
+      initialScope,
       priorityScore,
       suggestedCapability: getSuggestedCapability(priorityScore),
     };
@@ -1335,6 +1338,13 @@ function buildSummaryRows(results: FactorResultMap): SummaryRow[] {
     ...row,
     rank: ranks.get(row.objective) ?? 0,
   }));
+}
+
+function normalizeCobitRelativeScore(rawScore: number, maxRawScore: number) {
+  if (!Number.isFinite(rawScore) || !Number.isFinite(maxRawScore) || maxRawScore <= 0) {
+    return 0;
+  }
+  return Math.round(Math.trunc((rawScore / maxRawScore) * 100) / 5) * 5;
 }
 
 function getSuggestedCapability(priority: number) {
