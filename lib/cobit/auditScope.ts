@@ -152,6 +152,16 @@ export function questionMatchesObjective(clause: string, objectives: readonly Co
   return Boolean(objective && objectives.includes(objective));
 }
 
+export function isDesignFactorAdoptedObjective(row: { suggestedCapability: number }) {
+  return row.suggestedCapability >= 2;
+}
+
+export function getDesignFactorAdoptedObjectives(assessment: DesignFactorAssessmentInput): CobitObjective[] {
+  return buildDesignFactorSummaryRows(assessment)
+    .filter(isDesignFactorAdoptedObjective)
+    .map((row) => row.objective);
+}
+
 export function buildDesignFactorSummaryRows(assessment: DesignFactorAssessmentInput): CobitSummaryRow[] {
   const results: Record<FactorKey, ObjectiveCalculation[]> = {
     DF01: calculateDf01Results(mapDf01Input(assessment.df01Input)),

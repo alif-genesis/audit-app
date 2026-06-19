@@ -6,8 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { getActiveAdmin } from "@/lib/session";
 import { writeActivityLog } from "@/lib/activity-log";
 import {
-  buildDesignFactorSummaryRows,
   cobitBumn24Objectives,
+  getDesignFactorAdoptedObjectives,
   isCobitFramework,
   questionMatchesObjective,
   type CobitAuditScope,
@@ -288,17 +288,15 @@ async function getDesignFactorScopedQuestions<T extends { clause: string }>({
     return { questions: [], objectives: [] };
   }
 
-  const level4Objectives = buildDesignFactorSummaryRows(assessment)
-    .filter((row) => row.suggestedCapability === 4)
-    .map((row) => row.objective);
+  const adoptedObjectives = getDesignFactorAdoptedObjectives(assessment);
 
-  if (level4Objectives.length === 0) {
+  if (adoptedObjectives.length === 0) {
     return { questions: [], objectives: [] };
   }
 
   return {
-    questions: questions.filter((question) => questionMatchesObjective(question.clause, level4Objectives)),
-    objectives: level4Objectives,
+    questions: questions.filter((question) => questionMatchesObjective(question.clause, adoptedObjectives)),
+    objectives: adoptedObjectives,
   };
 }
 
@@ -311,7 +309,7 @@ function getDirectCobitScopeObjectives(scope: CobitAuditScope | "") {
 function formatCobitScope(scope: CobitAuditScope | "") {
   if (scope === "ALL_40") return "Seluruh Domain";
   if (scope === "BUMN_24") return "24 Domain BUMN";
-  if (scope === "DESIGN_FACTOR") return "Design Factor Level 4";
+  if (scope === "DESIGN_FACTOR") return "Design Factor Level 2-4";
   return "COBIT";
 }
 

@@ -939,8 +939,8 @@ function DesignFactorSummaryDashboard({
 }) {
   const sortedRows = [...rows].sort((a, b) => a.rank - b.rank);
   const highest = sortedRows[0] ?? rows[0];
+  const adoptedRows = sortedRows.filter((row) => row.suggestedCapability >= 2);
   const focusRows = sortedRows.filter((row) => row.suggestedCapability === 4);
-  const levelThreeRows = sortedRows.filter((row) => row.suggestedCapability === 3);
   const levelCounts = [4, 3, 2, 1].map((level) => ({
     level,
     count: rows.filter((row) => row.suggestedCapability === level).length,
@@ -985,19 +985,21 @@ function DesignFactorSummaryDashboard({
                 downloadedAt,
                 summaryTitle: "RINGKASAN",
                 summaryText: `Laporan ini menyajikan ringkasan hasil Design Factors COBIT 2019 untuk ${companyName}. Hasil ini digunakan untuk menentukan area tata kelola dan manajemen I&T yang perlu menjadi prioritas organisasi.`,
-                totalLabel: "AREA FOKUS LEVEL 4",
-                totalValue: String(focusRows.length),
+                totalLabel: "DOMAIN DIADOPSI LEVEL 2-4",
+                totalValue: String(adoptedRows.length),
                 stats: [
                   { label: "Total Objective", value: String(rows.length) },
+                  { label: "Diadopsi", value: String(adoptedRows.length) },
                   { label: "Level 4", value: String(levelCounts.find((item) => item.level === 4)?.count ?? 0) },
                   { label: "Level 3", value: String(levelCounts.find((item) => item.level === 3)?.count ?? 0) },
+                  { label: "Level 2", value: String(levelCounts.find((item) => item.level === 2)?.count ?? 0) },
                 ],
-                sectionTitle: "AREA PRIORITAS LEVEL 4",
-                bars: focusRows.map((row) => ({
+                sectionTitle: "DOMAIN DIADOPSI LEVEL 2-4",
+                bars: adoptedRows.map((row) => ({
                   label: row.objective,
                   value: row.priorityScore,
                 })),
-                note: "Domain dengan Priority Score 75 ke atas direkomendasikan sebagai area fokus utama dengan Suggested Capability Level 4. Semakin tinggi skor, semakin tinggi prioritas peningkatan tata kelola TI.",
+                note: "Domain dengan Suggested Capability Level 2, 3, dan 4 diadopsi dalam scope audit Design Factor. Domain Level 1 dikecualikan dari scope audit.",
                 tables: [
                   {
                     title: "Level Distribution",
@@ -1069,11 +1071,11 @@ function DesignFactorSummaryDashboard({
       <article className="users-panel df-insight-panel df-insight-top">
         <strong>Automated Insight</strong>
         <p>
-          Berdasarkan hasil Design Factors COBIT 2019 untuk {companyName}, terdapat <b>{focusRows.length} area fokus utama</b> dengan Suggested Capability Level 4. Area ini perlu menjadi prioritas roadmap implementasi COBIT, gap assessment, dan peningkatan tata kelola TI. Domain dengan Priority Score 75 ke atas direkomendasikan Level 4, sedangkan Priority Score 50-74 direkomendasikan Level 3.
+          Berdasarkan hasil Design Factors COBIT 2019 untuk {companyName}, terdapat <b>{adoptedRows.length} domain diadopsi</b> dengan Suggested Capability Level 2, 3, dan 4. Domain ini masuk scope audit COBIT, gap assessment, dan roadmap peningkatan tata kelola TI; hanya domain Level 1 yang dikecualikan dari scope adopsi.
         </p>
-        {focusRows.length > 0 ? (
+        {adoptedRows.length > 0 ? (
           <div className="focus-chip-list">
-            {focusRows.slice(0, 12).map((row) => (
+            {adoptedRows.slice(0, 24).map((row) => (
               <button key={row.objective} type="button" onClick={() => onSelectObjective(row.objective)}>
                 {row.objective}
               </button>
@@ -1084,8 +1086,8 @@ function DesignFactorSummaryDashboard({
 
       <div className="df-summary-cards">
         <SummaryCard label="Total Governance & Management Objectives" value={String(rows.length)} />
+        <SummaryCard label="Domain Diadopsi Level 2-4" value={`${adoptedRows.length} domain`} />
         <SummaryCard label="Area Fokus Level 4" value={`${focusRows.length} domain`} />
-        <SummaryCard label="Area Pendukung Level 3" value={`${levelThreeRows.length} domain`} />
         <article className="df-summary-card level-card">
           <span>Level Distribution</span>
           {levelCounts.map((item) => (
@@ -1113,12 +1115,12 @@ function DesignFactorSummaryDashboard({
       <div className="df-summary-grid priority-full-grid">
         <article className="users-panel df-summary-panel">
           <div className="section-heading compact-heading">
-            <h2>Area Prioritas Level 4</h2>
-            <p>Domain dengan Priority Score 75 ke atas.</p>
+            <h2>Domain Diadopsi Level 2-4</h2>
+            <p>Domain dengan Suggested Capability Level 2, 3, dan 4.</p>
           </div>
           <div className="priority-bars">
-            {focusRows.length > 0 ? (
-              focusRows.map((row) => (
+            {adoptedRows.length > 0 ? (
+              adoptedRows.map((row) => (
                 <button key={row.objective} type="button" onClick={() => onSelectObjective(row.objective)}>
                   <span>{row.objective}</span>
                   <div className="chart-track">
@@ -1128,7 +1130,7 @@ function DesignFactorSummaryDashboard({
                 </button>
               ))
             ) : (
-              <p className="empty-focus-note">Belum ada domain yang masuk Level 4.</p>
+              <p className="empty-focus-note">Belum ada domain yang masuk Level 2, 3, atau 4.</p>
             )}
           </div>
         </article>

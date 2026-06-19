@@ -381,7 +381,7 @@ function AuditModal({
     }
 
     if (!audit && isCobit && cobitScopeVal === "DESIGN_FACTOR" && !designFactorAssessmentId) {
-      setFormError("❌ Pilih Design Factor yang sudah submit untuk scope Level 4");
+      setFormError("❌ Pilih Design Factor yang sudah submit untuk scope Level 2-4");
       e.preventDefault();
       return;
     }
@@ -513,7 +513,7 @@ function AuditModal({
                   }}
                 >
                   {[
-                    { value: "DESIGN_FACTOR", title: "Design Factor Level 4", desc: "Otomatis ambil domain prioritas dari Summary." },
+                    { value: "DESIGN_FACTOR", title: "Design Factor Level 2-4", desc: "Otomatis ambil domain adopsi dari Summary, kecuali Level 1." },
                     { value: "ALL_40", title: "Seluruh Domain", desc: "Gunakan semua 40 objective COBIT." },
                     { value: "BUMN_24", title: "24 Domain BUMN", desc: "Gunakan daftar domain sesuai regulasi BUMN." },
                   ].map((option) => (

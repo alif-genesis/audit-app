@@ -38,7 +38,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveAdmin, getCurrentUser } from "@/lib/session";
 import { writeActivityLog } from "@/lib/activity-log";
 import {
-  buildDesignFactorSummaryRows,
+  getDesignFactorAdoptedObjectives,
   isCobitFramework,
   questionMatchesObjective,
 } from "@/lib/cobit/auditScope";
@@ -750,11 +750,9 @@ export async function ensureCobitAuditFromSubmittedDesignFactor(assessmentId: st
     return;
   }
 
-  const level4Objectives = buildDesignFactorSummaryRows(assessment)
-    .filter((row) => row.suggestedCapability === 4)
-    .map((row) => row.objective);
+  const adoptedObjectives = getDesignFactorAdoptedObjectives(assessment);
 
-  if (level4Objectives.length === 0) {
+  if (adoptedObjectives.length === 0) {
     return;
   }
 
@@ -762,7 +760,7 @@ export async function ensureCobitAuditFromSubmittedDesignFactor(assessmentId: st
     where: { auditTypeId: auditType.id },
     orderBy: { sortOrder: "asc" },
   });
-  const scopedQuestions = questions.filter((question) => questionMatchesObjective(question.clause, level4Objectives));
+  const scopedQuestions = questions.filter((question) => questionMatchesObjective(question.clause, adoptedObjectives));
 
   if (scopedQuestions.length === 0) {
     return;
@@ -777,9 +775,9 @@ export async function ensureCobitAuditFromSubmittedDesignFactor(assessmentId: st
       startDate: new Date(),
       status: "IN_PROGRESS",
       description: [
-        "Scope Audit COBIT: Design Factor Level 4",
+        "Scope Audit COBIT: Design Factor Level 2-4",
         `Baseline COBIT: ${assessment.targetScore ?? 3}`,
-        `Scope Objectives: ${level4Objectives.join(", ")}`,
+        `Scope Objectives: ${adoptedObjectives.join(", ")}`,
         `Design Factor Assessment ID: ${assessment.id}`,
       ].join("\n"),
       assignments: {
