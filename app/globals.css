@@ -2156,7 +2156,7 @@ select:disabled {
 }
 
 .cobit-process-score-table {
-  min-width: 1180px;
+  min-width: 920px;
   font-size: 13px;
 }
 
@@ -2181,11 +2181,6 @@ select:disabled {
   font-style: italic;
   font-weight: 950;
   line-height: 1.25;
-}
-
-.cobit-process-score-table td:nth-child(4) {
-  min-width: 260px;
-  text-align: left;
 }
 
 .cobit-process-score-table td:last-child strong {

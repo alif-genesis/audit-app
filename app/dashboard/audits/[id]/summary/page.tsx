@@ -773,7 +773,6 @@ function CobitSummarySection({
               <th>Domain</th>
               <th>No</th>
               <th>Kode</th>
-              <th>Nama Proses</th>
               <th>Level 1</th>
               <th>Level 2</th>
               <th>Level 3</th>
@@ -788,7 +787,6 @@ function CobitSummarySection({
                 <td>{getCobitDomainTitle(objective.domain || objective.objective.slice(0, 3))}</td>
                 <td>{index + 1}</td>
                 <td><strong>{objective.objective}</strong></td>
-                <td><em>{objective.title}</em></td>
                 {COBIT_LEVELS.map((levelNumber) => {
                   const level = objective.levels.find((item) => item.level === levelNumber);
 
