@@ -274,6 +274,7 @@ export function AuditFindingsForm({
                         <td key={level.level}>
                           <strong>{level.rating}</strong>
                           <span>{level.applicable ? `${level.percentage}% (${level.yes}/${level.total})` : "N/A"}</span>
+                          {level.applicable ? <span>Y: {level.yes} / N: {level.no}</span> : null}
                         </td>
                       ))}
                       <td>

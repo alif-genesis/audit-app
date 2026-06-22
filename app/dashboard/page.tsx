@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin-shell";
+import { AutoRefreshPage } from "@/components/auto-refresh-page";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 
@@ -55,6 +56,7 @@ export default async function DashboardPage() {
 
   return (
     <AdminShell active="dashboard">
+        <AutoRefreshPage />
         <section className="dashboard-content">
           <div className="dashboard-hero">
             <div>

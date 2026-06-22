@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { AdminShell } from "@/components/admin-shell";
+import { AutoRefreshPage } from "@/components/auto-refresh-page";
 import { syncCobitAuditResponses } from "@/lib/cobit/auditSync";
 import { buildCobitAuditSummary, buildCobitAuditorResponseData, getCobitRating, type CobitAuditSummary } from "@/lib/cobit/capabilityAudit";
 import { DownloadAuditReportButton } from "./download-audit-report-button";
@@ -173,6 +174,7 @@ export default async function AuditSummaryPage({
 
   return (
     <AdminShell active={isCobit ? "cobit-audits" : "audits"}>
+      <AutoRefreshPage />
       <section className="company-detail-header">
         <div className="company-title-block">
           <Link
@@ -821,6 +823,7 @@ function CobitSummarySection({
                     <td key={level.level}>
                       <strong>{level.rating}</strong>
                       <span>{level.applicable ? `${level.percentage}% (${level.yes}/${level.total})` : "N/A"}</span>
+                      {level.applicable ? <span>Y: {level.yes} / N: {level.no}</span> : null}
                     </td>
                   ))}
                   <td>

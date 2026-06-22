@@ -34,6 +34,7 @@ export type CobitLevelSummary = {
   level: CobitLevel;
   total: number;
   yes: number;
+  no: number;
   percentage: number;
   rating: CobitRating;
   applicable: boolean;
@@ -125,7 +126,7 @@ export function buildCobitAuditSummary(
 
   const objectives = [...objectiveMap.entries()]
     .map(([objective, objectiveQuestions]) => buildObjectiveSummary(objective, objectiveQuestions, responseMap))
-    .sort((a, b) => a.objective.localeCompare(b.objective));
+    .sort(compareCobitObjectives);
 
   const domains = COBIT_DOMAINS.map((domain) => {
     const domainObjectives = objectives.filter((objective) => objective.domain === domain);
@@ -167,6 +168,34 @@ export function buildCobitAuditSummary(
   };
 }
 
+function compareCobitObjectives(a: CobitObjectiveSummary, b: CobitObjectiveSummary) {
+  const domainA = getCobitDomainOrder(a.domain);
+  const domainB = getCobitDomainOrder(b.domain);
+
+  if (domainA !== domainB) {
+    return domainA - domainB;
+  }
+
+  const numberA = getCobitObjectiveNumber(a.objective);
+  const numberB = getCobitObjectiveNumber(b.objective);
+
+  if (numberA !== numberB) {
+    return numberA - numberB;
+  }
+
+  return a.objective.localeCompare(b.objective);
+}
+
+function getCobitDomainOrder(domain: CobitDomain | "") {
+  const index = COBIT_DOMAINS.indexOf(domain as CobitDomain);
+  return index === -1 ? COBIT_DOMAINS.length : index;
+}
+
+function getCobitObjectiveNumber(objective: string) {
+  const match = objective.match(/\d+/);
+  return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
+}
+
 export function buildCobitAuditorResponseData(
   responses: Array<{ id: string; questionId: string; compliance: ComplianceStatus | string }>,
   findings: CobitFindingLike[],
@@ -204,6 +233,7 @@ function buildObjectiveSummary(
   const levels = COBIT_LEVELS.map((level) => {
     const levelQuestions = questions.filter((question) => parseCobitClause(question.clause).level === level);
     const yes = levelQuestions.filter((question) => responseMap.get(question.id)?.compliance === "COMPLY").length;
+    const no = levelQuestions.filter((question) => responseMap.get(question.id)?.compliance === "NOT_COMPLY").length;
     const percentage = levelQuestions.length > 0 ? Math.round((yes / levelQuestions.length) * 100) : 0;
     const applicable = levelQuestions.length > 0;
 
@@ -211,6 +241,7 @@ function buildObjectiveSummary(
       level,
       total: levelQuestions.length,
       yes,
+      no,
       percentage,
       rating: applicable ? getCobitRating(percentage) : "N/A",
       applicable,

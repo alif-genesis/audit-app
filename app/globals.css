@@ -1228,6 +1228,14 @@ select:disabled {
   font-weight: 900;
 }
 
+.row-actions .row-action-note {
+  max-width: 120px;
+  color: #9a5a00;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
 .row-actions button:disabled {
   color: #c7d0df;
   cursor: not-allowed;
@@ -1549,6 +1557,16 @@ select:disabled {
   box-shadow: 0 8px 16px rgba(38, 68, 103, 0.08);
 }
 
+.question-card.answered {
+  border-color: #bfe8cd;
+  background: #f0fbf4;
+}
+
+.question-card.pending {
+  border-color: #f3df9b;
+  background: #fff9e8;
+}
+
 .question-header {
   display: flex;
   justify-content: space-between;
@@ -1624,6 +1642,71 @@ select:disabled {
   color: #172033;
   font-weight: 650;
   line-height: 1.55;
+}
+
+.field-hint {
+  display: block;
+  margin: 4px 0 8px;
+  color: #667895;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.evidence-upload-table-wrap {
+  width: 100%;
+  margin-top: 10px;
+  overflow-x: auto;
+  border: 1px solid #dbe7f6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.evidence-upload-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.evidence-upload-table th,
+.evidence-upload-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #e7edf7;
+  color: #172033;
+  text-align: left;
+  vertical-align: top;
+}
+
+.evidence-upload-table th {
+  color: #526780;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.evidence-upload-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.evidence-upload-table td:first-child {
+  width: 44px;
+  color: #667895;
+  font-weight: 900;
+}
+
+.evidence-upload-table td:nth-child(3) {
+  width: 92px;
+  white-space: nowrap;
+}
+
+.evidence-upload-table a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #1c57df;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .response-fields {

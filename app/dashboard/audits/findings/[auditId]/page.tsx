@@ -169,7 +169,9 @@ export default async function AuditFindingsPage({
               color: "#667895",
             }}
           >
-            Belum ada jawaban dari auditee.
+            {isCobit
+              ? "Auditee belum submit final. Jawaban yang masih draft atau tersimpan sementara belum masuk tahap review auditor."
+              : "Belum ada jawaban final dari auditee."}
           </div>
         ) : (
           <AuditFindingsForm audit={audit} responses={responses} findings={findingMap} />

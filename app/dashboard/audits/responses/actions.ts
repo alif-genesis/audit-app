@@ -18,6 +18,7 @@ export type ResponseFormState = {
 };
 
 type EvidenceUploadResult = { paths: string[] } | { error: string };
+const MAX_EVIDENCE_FILES = 5;
 
 function withToastId(state: ResponseFormState): ResponseFormState {
   return state.toast ? { toast: { ...state.toast, id: Date.now() } } : state;
@@ -35,12 +36,13 @@ export async function submitAuditResponseAction(
   const auditId = String(formData.get("auditId") || "").trim();
   const responses = formData.getAll("responses[]");
   const intent = String(formData.get("intent") || "submit");
+  const isSubmit = intent === "submit";
 
-  if (!auditId || responses.length === 0) {
+  if (!auditId) {
     return withToastId({
       toast: {
         type: "error",
-        message: "Audit ID dan jawaban wajib diisi.",
+        message: "Audit ID wajib diisi.",
       },
     });
   }
@@ -77,6 +79,15 @@ export async function submitAuditResponseAction(
       return withToastId({ toast: { type: "error", message: "Jawaban audit sudah final dan tidak bisa diubah atau disubmit ulang." } });
     }
 
+    if (!isSubmit && responses.length === 0) {
+      return withToastId({
+        toast: {
+          type: "success",
+          message: "Tidak ada perubahan baru.",
+        },
+      });
+    }
+
     let responseUpdates: Array<{
       auditId: string;
       auditeeId: string;
@@ -100,7 +111,6 @@ export async function submitAuditResponseAction(
       return withToastId({ toast: { type: "error", message: "Format jawaban audit tidak valid." } });
     }
 
-    const isSubmit = intent === "submit";
     const incomplete = responseUpdates.some(
       (response) =>
         !response.questionId ||
@@ -156,29 +166,14 @@ export async function submitAuditResponseAction(
 
     if (isSubmit) {
       const savedResponses = savedResponsesForDiff;
-      const savedMap = new Map(savedResponses.map((response) => [response.questionId, response]));
       const missingDescription = !isCobit
-        ? responseUpdates.find((response) => response.compliance !== "NA" && response.description.trim().length === 0)
+        ? savedResponses.find((response) => response.compliance !== "NA" && !response.description?.trim())
         : null;
       if (missingDescription) {
-        const clause = savedMap.get(missingDescription.questionId)?.question.clause ?? "pertanyaan ini";
         return withToastId({
           toast: {
             type: "error",
-            message: `Belum mengisi deskripsi di ${clause}.`,
-          },
-        });
-      }
-
-      const unsavedChange = responseUpdates.find((response) => {
-        const saved = savedMap.get(response.questionId);
-        return !saved || saved.compliance !== response.compliance || (saved.description ?? "") !== response.description;
-      });
-      if (unsavedChange) {
-        return withToastId({
-          toast: {
-            type: "error",
-            message: "Ada perubahan yang belum disimpan. Klik Simpan Sementara dulu sebelum Submit Final.",
+            message: `Belum mengisi deskripsi di ${missingDescription.question.clause}.`,
           },
         });
       }
@@ -194,8 +189,8 @@ export async function submitAuditResponseAction(
       }
     }
 
-    // Batch update responses
-    for (const resp of responseUpdates) {
+    // Save only rows that were changed in this browser session.
+    for (const resp of isSubmit ? [] : responseUpdates) {
       const files = formData
         .getAll(`supportingFiles-${resp.questionId}`)
         .filter((file): file is File => file instanceof File && file.size > 0);
@@ -226,6 +221,22 @@ export async function submitAuditResponseAction(
             select: { attachments: true },
           })
         : null;
+      const mergedAttachments = uploadedFiles
+        ? [...(existingResponse?.attachments ?? []), ...uploadedFiles.paths]
+        : [];
+      const activeAttachments = mergedAttachments.slice(-MAX_EVIDENCE_FILES);
+      const replacedAttachments = mergedAttachments.slice(0, Math.max(0, mergedAttachments.length - MAX_EVIDENCE_FILES));
+
+      if (replacedAttachments.length > 0) {
+        await prisma.evidenceFile.updateMany({
+          where: {
+            auditId: resp.auditId,
+            questionId: resp.questionId,
+            downloadPath: { in: replacedAttachments },
+          },
+          data: { isActive: false },
+        });
+      }
 
       await prisma.auditResponse.update({
         where: {
@@ -238,7 +249,7 @@ export async function submitAuditResponseAction(
         data: {
           compliance: resp.compliance,
           description: resp.description,
-          ...(uploadedFiles ? { attachments: [...(existingResponse?.attachments ?? []), ...uploadedFiles.paths] } : {}),
+          ...(uploadedFiles ? { attachments: activeAttachments } : {}),
         },
       });
     }
@@ -300,12 +311,17 @@ async function saveSupportingFiles({
   uploadedById: string;
   files: File[];
 }): Promise<EvidenceUploadResult> {
-  const maxFiles = 5;
   const maxFileBytes = 10 * 1024 * 1024;
+  const maxTotalBytes = MAX_EVIDENCE_FILES * maxFileBytes;
   const allowedExtensions = new Set([".pdf", ".png", ".jpg", ".jpeg", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"]);
 
-  if (files.length > maxFiles) {
+  if (files.length > MAX_EVIDENCE_FILES) {
     return { error: "Maksimal 5 file evidence untuk setiap pertanyaan." };
+  }
+
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  if (totalBytes > maxTotalBytes) {
+    return { error: "Total ukuran evidence maksimal 50 MB untuk 5 file." };
   }
 
   for (const file of files) {
@@ -314,7 +330,7 @@ async function saveSupportingFiles({
       return { error: "Format evidence harus PDF, image, Word, Excel, CSV, atau TXT." };
     }
     if (file.size > maxFileBytes) {
-      return { error: "Ukuran setiap file evidence maksimal 10 MB." };
+      return { error: `File "${file.name}" melebihi 10 MB. Ukuran maksimal adalah 10 MB per file, total maksimal 50 MB.` };
     }
   }
 

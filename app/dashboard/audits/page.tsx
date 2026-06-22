@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Eye, Search, Settings } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
 import { AutoSubmitForm } from "@/components/auto-submit-form";
+import { AutoRefreshPage } from "@/components/auto-refresh-page";
 import { CustomSelect } from "@/components/custom-select";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
@@ -130,6 +131,7 @@ export default async function AuditsPage({ searchParams }: AuditsPageProps) {
 
   return (
     <AdminShell active="audits">
+      <AutoRefreshPage />
       <section className="page-header">
         <div>
           <div className="title-row">

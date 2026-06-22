@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Eye, Radar, Search, Settings } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
 import { AutoSubmitForm } from "@/components/auto-submit-form";
+import { AutoRefreshPage } from "@/components/auto-refresh-page";
 import { CustomSelect } from "@/components/custom-select";
 import { buildCobitAuditSummary, buildCobitAuditorResponseData } from "@/lib/cobit/capabilityAudit";
 import { syncCobitAuditResponses } from "@/lib/cobit/auditSync";
@@ -166,6 +167,7 @@ export default async function CobitAuditsPage({ searchParams }: CobitAuditsPageP
 
   return (
     <AdminShell active="cobit-audits">
+      <AutoRefreshPage />
       <section className="page-header">
         <div>
           <div className="title-row">
@@ -298,6 +300,8 @@ export default async function CobitAuditsPage({ searchParams }: CobitAuditsPageP
                               <Settings size={16} aria-hidden="true" />
                               Nilai
                             </Link>
+                          ) : isAssignedAuditor && submittedResponses.length === 0 ? (
+                            <span className="row-action-note">Menunggu auditee submit</span>
                           ) : null}
                           <Link href={`/dashboard/audits/${audit.id}/summary`} title="Lihat hasil audit">
                             <Eye size={17} aria-hidden="true" />
@@ -344,7 +348,7 @@ function getAuditProgress({
   const submittedResponses = responses.filter((response) => response.submittedAt);
 
   if (totalQuestions === 0 || submittedResponses.length < totalQuestions) {
-    return { label: "Belum Diisi Auditee", className: "pending" };
+    return { label: "Menunggu Submit Auditee", className: "pending" };
   }
 
   const reviewedCount = submittedResponses.filter((response) => reviewedResponses.has(response.id)).length;

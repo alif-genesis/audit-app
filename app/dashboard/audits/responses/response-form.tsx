@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Plus } from "lucide-react";
+import { ExternalLink, Plus } from "lucide-react";
 import type { Audit, AuditQuestion, AuditResponse } from "@prisma/client";
 import { CustomSelect } from "@/components/custom-select";
 import { Toast } from "@/components/toast";
@@ -22,6 +22,23 @@ type ResponseDraft = {
   description: string;
 };
 
+type LiveResponse = {
+  questionId: string;
+  compliance: string;
+  description: string;
+  attachments: string[];
+  evidenceFiles?: EvidenceItem[];
+  submittedAt: string | null;
+  updatedAt: string;
+};
+
+type EvidenceItem = {
+  path: string;
+  name: string;
+  size?: number;
+  uploadedAt?: string;
+};
+
 const initialState: ResponseFormState = {};
 
 export function AuditResponseForm({
@@ -39,6 +56,32 @@ export function AuditResponseForm({
   const [hiddenStateToastKey, setHiddenStateToastKey] = useState<string | number | null>(null);
   const [questionFilter, setQuestionFilter] = useState<"all" | "pending" | "submitted">(
     initialFilter === "pending" || initialFilter === "submitted" ? initialFilter : "all",
+  );
+  const autoSaveTimersRef = useRef<Record<string, number>>({});
+  const fileQuestionIdsRef = useRef<Set<string>>(new Set());
+  const [touchedQuestionIds, setTouchedQuestionIds] = useState<Set<string>>(() => new Set());
+  const [fileQuestionIds, setFileQuestionIds] = useState<Set<string>>(() => new Set());
+  const [liveResponses, setLiveResponses] = useState<Record<string, LiveResponse>>(() =>
+    Object.fromEntries(
+      questions.map((question) => {
+        const response = responses.get(question.id);
+        return [
+          question.id,
+          {
+            questionId: question.id,
+            compliance: response?.compliance || "NA",
+            description: response?.description || "",
+            attachments: response?.attachments ?? [],
+            evidenceFiles: (response?.attachments ?? []).map((path) => ({
+              path,
+              name: getEvidenceFileName(path),
+            })),
+            submittedAt: response?.submittedAt?.toISOString() ?? null,
+            updatedAt: response?.updatedAt?.toISOString() ?? "",
+          },
+        ];
+      }),
+    ),
   );
   const [responseDrafts, setResponseDrafts] = useState<Record<string, ResponseDraft>>(() =>
     Object.fromEntries(
@@ -72,7 +115,7 @@ export function AuditResponseForm({
     [audit.description, isCobit, questions, responseDrafts],
   );
   const activeObjectiveSummary = cobitSummary?.objectives.find((objective) => objective.objective === selectedObjective) ?? null;
-  const allVisibleSubmitted = questions.length > 0 && questions.every((question) => responses.get(question.id)?.submittedAt);
+  const allVisibleSubmitted = questions.length > 0 && questions.every((question) => liveResponses[question.id]?.submittedAt);
   const allSavedAnswered = questions.length > 0 && questions.every((question) => isDraftComplete(responseDrafts[question.id], isCobit));
   const canSubmitFinal = allSavedAnswered && !hasUnsavedChanges && !allVisibleSubmitted;
   const submitFinalLabel = allVisibleSubmitted
@@ -103,8 +146,68 @@ export function AuditResponseForm({
   useEffect(() => {
     if (state.toast?.type === "success") {
       setHasUnsavedChanges(false);
+      setTouchedQuestionIds(new Set());
+      setFileQuestionIds(new Set());
+      fileQuestionIdsRef.current = new Set();
     }
   }, [state.toast]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchLatestResponses = async () => {
+      try {
+        const response = await fetch(`/api/audits/${audit.id}/responses`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as { responses?: LiveResponse[] };
+        if (cancelled || !Array.isArray(data.responses)) {
+          return;
+        }
+
+        setLiveResponses(
+          Object.fromEntries(data.responses.map((item) => [item.questionId, item])),
+        );
+        setResponseDrafts((current) => {
+          const next = { ...current };
+          for (const item of data.responses ?? []) {
+            if (touchedQuestionIds.has(item.questionId)) {
+              continue;
+            }
+            next[item.questionId] = {
+              questionId: item.questionId,
+              compliance: item.compliance || "NA",
+              description: item.description || "",
+            };
+          }
+          return next;
+        });
+      } catch {
+        // Live updates are best-effort; saving still uses server validation.
+      }
+    };
+
+    const interval = window.setInterval(fetchLatestResponses, 1500);
+    void fetchLatestResponses();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [audit.id, touchedQuestionIds]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(autoSaveTimersRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+    };
+  }, []);
 
   const hideCurrentToast = () => {
     const key = state.toast?.id ?? state.toast?.message;
@@ -117,20 +220,72 @@ export function AuditResponseForm({
   const updateResponseDraft = (questionId: string, patch: Partial<ResponseDraft>) => {
     setHasUnsavedChanges(true);
     hideCurrentToast();
+    setTouchedQuestionIds((current) => {
+      const next = new Set(current);
+      next.add(questionId);
+      return next;
+    });
     setResponseDrafts((current) => {
       const previous = current[questionId] ?? {
         questionId,
         compliance: "NA",
         description: "",
       };
+      const nextDraft = {
+        ...previous,
+        ...patch,
+      };
+      scheduleAutoSave(nextDraft);
       return {
         ...current,
-        [questionId]: {
-          ...previous,
-          ...patch,
-        },
+        [questionId]: nextDraft,
       };
     });
+  };
+
+  const scheduleAutoSave = (draft: ResponseDraft) => {
+    window.clearTimeout(autoSaveTimersRef.current[draft.questionId]);
+    autoSaveTimersRef.current[draft.questionId] = window.setTimeout(() => {
+      void saveLiveResponse(draft);
+    }, 650);
+  };
+
+  const saveLiveResponse = async (draft: ResponseDraft) => {
+    try {
+      const response = await fetch(`/api/audits/${audit.id}/responses`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = (await response.json()) as { response?: LiveResponse };
+      if (!data.response) {
+        return;
+      }
+
+      setLiveResponses((current) => ({
+        ...current,
+        [data.response!.questionId]: data.response!,
+      }));
+      setTouchedQuestionIds((current) => {
+        if (fileQuestionIdsRef.current.has(draft.questionId)) {
+          return current;
+        }
+
+        const next = new Set(current);
+        next.delete(draft.questionId);
+        if (next.size === 0 && fileQuestionIdsRef.current.size === 0) {
+          setHasUnsavedChanges(false);
+        }
+        return next;
+      });
+    } catch {
+      // Manual Save Sementara remains available if a live save fails.
+    }
   };
 
   const confirmNavigation = () => {
@@ -150,12 +305,12 @@ export function AuditResponseForm({
 
       <form action={formAction} className="audit-response-form">
         <input name="auditId" type="hidden" value={audit.id} />
-        {questions.map((question) => (
+        {[...new Set([...touchedQuestionIds, ...fileQuestionIds])].map((questionId) => (
           <input
-            key={`response-payload-${question.id}`}
+            key={`response-payload-${questionId}`}
             name="responses[]"
             type="hidden"
-            value={JSON.stringify(responseDrafts[question.id])}
+            value={JSON.stringify(responseDrafts[questionId])}
             readOnly
           />
         ))}
@@ -246,6 +401,7 @@ export function AuditResponseForm({
                         <td key={level.level}>
                           <strong>{level.rating}</strong>
                           <span>{level.applicable ? `${level.percentage}% (${level.yes}/${level.total})` : "N/A"}</span>
+                          {level.applicable ? <span>Y: {level.yes} / N: {level.no}</span> : null}
                         </td>
                       ))}
                       <td>
@@ -287,7 +443,7 @@ export function AuditResponseForm({
             Tidak ada pertanyaan yang sesuai dengan filter.
           </div>
         ) : visibleQuestions.map((question, index) => {
-          const response = responses.get(question.id);
+          const response = liveResponses[question.id];
           const draft = responseDrafts[question.id] ?? {
             questionId: question.id,
             compliance: "NA",
@@ -295,8 +451,10 @@ export function AuditResponseForm({
           };
           const cobitParts = parseCobitClause(question.clause);
 
+          const isAnswered = isDraftComplete(draft, isCobit);
+
           return (
-            <div key={question.id} className="question-card">
+            <div key={question.id} className={`question-card ${isAnswered ? "answered" : "pending"}`}>
               <div className="question-header">
                 <div>
                   <h3 className="question-main-text">{question.question}</h3>
@@ -304,22 +462,14 @@ export function AuditResponseForm({
                     <span className="question-number">
                       Q{index + 1} - {isCobit ? `${cobitParts.objective || question.clause} Level ${cobitParts.level || "-"}` : `Klausul ${question.clause}`}
                     </span>
-                    {question.title && <p className="question-context-text">{question.title}</p>}
                   </div>
                 </div>
-                {isDraftComplete(draft, isCobit) ? (
-                  <span className="submitted-badge">Sudah Dijawab</span>
+                {isAnswered ? (
+                  <span className="status-badge done">Sudah Dijawab</span>
                 ) : (
                   <span className="status-badge pending">Belum Dijawab</span>
                 )}
               </div>
-
-              {question.requirement && (
-                <div className="question-section">
-                  <strong>Prasyarat Standar:</strong>
-                  <p>{question.requirement}</p>
-                </div>
-              )}
 
               <div className="response-fields" id={`response-fields-${question.id}`}>
                 <label>
@@ -370,18 +520,28 @@ export function AuditResponseForm({
                 </label>
                 <label className="full-field">
                   <span>File Pendukung</span>
+                  <small className="field-hint">Maksimal 5 file aktif per pertanyaan. Ukuran maksimal 10 MB per file, sehingga total maksimal 50 MB. Jika sudah 5 file, upload berikutnya menggantikan file paling lama.</small>
                   <input
                     name={`supportingFiles-${question.id}`}
                     type="file"
                     multiple
                     onChange={() => {
                       setHasUnsavedChanges(true);
+                      fileQuestionIdsRef.current = new Set(fileQuestionIdsRef.current).add(question.id);
+                      setFileQuestionIds((current) => {
+                        const next = new Set(current);
+                        next.add(question.id);
+                        return next;
+                      });
+                      setTouchedQuestionIds((current) => {
+                        const next = new Set(current);
+                        next.add(question.id);
+                        return next;
+                      });
                       hideCurrentToast();
                     }}
                   />
-                  {response?.attachments?.length ? (
-                    <small>File tersimpan: {response.attachments.join(", ")}</small>
-                  ) : null}
+                  <EvidenceUploadTable evidenceFiles={response?.evidenceFiles} attachments={response?.attachments ?? []} />
                 </label>
               </div>
             </div>
@@ -391,6 +551,73 @@ export function AuditResponseForm({
       </form>
     </>
   );
+}
+
+function EvidenceUploadTable({
+  evidenceFiles,
+  attachments,
+}: {
+  evidenceFiles?: EvidenceItem[];
+  attachments: string[];
+}) {
+  const rows: EvidenceItem[] =
+    evidenceFiles && evidenceFiles.length > 0
+      ? evidenceFiles
+      : attachments.map((path) => ({
+          path,
+          name: getEvidenceFileName(path),
+        }));
+
+  if (rows.length === 0) {
+    return <small className="field-hint">Belum ada file evidence tersimpan.</small>;
+  }
+
+  return (
+    <div className="evidence-upload-table-wrap">
+      <table className="evidence-upload-table">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Nama File</th>
+            <th>Ukuran</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((file, index) => (
+            <tr key={file.path}>
+              <td>{index + 1}</td>
+              <td>{file.name}</td>
+              <td>{typeof file.size === "number" ? formatFileSize(file.size) : "-"}</td>
+              <td>
+                <a href={file.path} target="_blank" rel="noreferrer">
+                  <ExternalLink size={14} aria-hidden="true" />
+                  Buka
+                </a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function getEvidenceFileName(path: string) {
+  const rawName = path.split("/").pop() || "Evidence";
+  return rawName.replace(/^\d+-/, "");
+}
+
+function formatFileSize(size: number) {
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (size >= 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+
+  return `${size} B`;
 }
 
 function CobitLevelAverageTable({

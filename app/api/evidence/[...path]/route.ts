@@ -43,6 +43,7 @@ export async function GET(_request: Request, { params }: EvidenceRouteProps) {
       auditId,
       questionId,
       downloadPath,
+      isActive: true,
       ...(currentUser.role === "ADMIN"
         ? {}
         : {
