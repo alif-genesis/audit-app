@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/session";
 import { AdminShell } from "@/components/admin-shell";
 import { AutoRefreshPage } from "@/components/auto-refresh-page";
 import { syncCobitAuditResponses } from "@/lib/cobit/auditSync";
-import { buildCobitAuditSummary, buildCobitAuditorResponseData, getCobitRating, type CobitAuditSummary } from "@/lib/cobit/capabilityAudit";
+import { buildCobitAuditSummary, buildCobitAuditorResponseData, COBIT_LEVELS, type CobitAuditSummary } from "@/lib/cobit/capabilityAudit";
 import { DownloadAuditReportButton } from "./download-audit-report-button";
 import { transitionAuditApprovalAction } from "../../../workflow-actions";
 
@@ -135,6 +135,7 @@ export default async function AuditSummaryPage({
     totalQuestions > 0 && answeredCount >= totalQuestions && reviewedCount >= totalQuestions;
   const evidenceRows = responses.filter((response) => response.attachments.length > 0);
   const evidenceCount = evidenceRows.reduce((total, response) => total + response.attachments.length, 0);
+  const evidenceGroups = groupEvidenceRowsByObjective(evidenceRows, isCobit);
   const displayStatus = isAuditComplete ? "COMPLETED" : audit.status;
   const statusLabel =
     displayStatus === "IN_PROGRESS"
@@ -241,113 +242,12 @@ export default async function AuditSummaryPage({
       </section>
 
       {cobitSummary ? (
-        <CobitSummarySection summary={cobitSummary} companyName={audit.companyName} />
+        <CobitSummarySection
+          summary={cobitSummary}
+          companyName={audit.companyName}
+          auditDescription={audit.description}
+        />
       ) : null}
-
-      <section className="users-panel">
-        <div className="section-heading">
-          <div>
-            <h2>Informasi Audit</h2>
-          </div>
-        </div>
-
-        <div className="audit-info-grid">
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "12px",
-                fontWeight: "900",
-                color: "#667895",
-                textTransform: "uppercase",
-              }}
-            >
-              Framework
-            </p>
-            <p
-              style={{
-                margin: "8px 0 0",
-                fontSize: "16px",
-                fontWeight: "850",
-                color: "#1c1c1c",
-              }}
-            >
-              {audit.auditType.name}
-            </p>
-          </div>
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "12px",
-                fontWeight: "900",
-                color: "#667895",
-                textTransform: "uppercase",
-              }}
-            >
-              Mode
-            </p>
-            <p
-              style={{
-                margin: "8px 0 0",
-                fontSize: "16px",
-                fontWeight: "850",
-                color: "#1c1c1c",
-              }}
-            >
-              {audit.mode === "GAP_ASSESSMENT"
-                ? "Gap Assessment"
-                : "Audit Internal"}
-            </p>
-          </div>
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "12px",
-                fontWeight: "900",
-                color: "#667895",
-                textTransform: "uppercase",
-              }}
-            >
-              Auditor
-            </p>
-            <p
-              style={{
-                margin: "8px 0 0",
-                fontSize: "16px",
-                fontWeight: "850",
-                color: "#1c57df",
-              }}
-            >
-              {assignment?.auditor?.name}
-            </p>
-          </div>
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "12px",
-                fontWeight: "900",
-                color: "#667895",
-                textTransform: "uppercase",
-              }}
-            >
-              Auditee
-            </p>
-            <p
-              style={{
-                margin: "8px 0 0",
-                fontSize: "16px",
-                fontWeight: "850",
-                color: "#1c57df",
-              }}
-            >
-              {assignment?.auditee?.name}
-            </p>
-          </div>
-        </div>
-      </section>
 
       {isAdmin ? (
         <ApprovalPanel
@@ -357,6 +257,7 @@ export default async function AuditSummaryPage({
         />
       ) : null}
 
+      {!isCobit ? (
       <section className="users-panel">
         <div className="section-heading">
           <div>
@@ -451,6 +352,7 @@ export default async function AuditSummaryPage({
           </div>
         </div>
       </section>
+      ) : null}
 
       <section className="users-panel">
         <div className="section-heading">
@@ -460,8 +362,8 @@ export default async function AuditSummaryPage({
           </div>
         </div>
 
-        <div className="table-wrap">
-          <table className="user-table" style={{ fontSize: "14px" }}>
+        <div className={isCobit ? "table-wrap compact-scroll-table" : "table-wrap"}>
+          <table className={`user-table ${isCobit ? "compact-compliance-table" : ""}`} style={{ fontSize: isCobit ? "12px" : "14px" }}>
             <thead>
               <tr>
                 <th>Klausul</th>
@@ -591,15 +493,26 @@ export default async function AuditSummaryPage({
           <span className="evidence-count-badge">{evidenceCount} File</span>
         </div>
 
-        {evidenceRows.length > 0 ? (
-          <div className="evidence-summary-grid">
-            {evidenceRows.map((response) => (
-              <article className="evidence-summary-card" key={response.id}>
-                <div>
-                  <span>{response.question.clause}</span>
-                  <strong>{response.question.title || response.question.question}</strong>
+        {evidenceGroups.length > 0 ? (
+          <div className="evidence-domain-grid">
+            {evidenceGroups.map((group) => (
+              <article className="evidence-domain-card" key={group.domain}>
+                <div className="evidence-domain-head">
+                  <div>
+                    <strong>{group.domain}</strong>
+                  </div>
+                  <b>{group.fileCount} File</b>
                 </div>
-                <EvidenceLinks attachments={response.attachments} />
+                <div className="evidence-summary-list">
+                  {group.rows.map((response) => (
+                    <div className="evidence-summary-card" key={response.id}>
+                      <div>
+                        <span>{formatEvidenceClause(response.question.clause, isCobit)}</span>
+                      </div>
+                      <EvidenceLinks attachments={response.attachments} />
+                    </div>
+                  ))}
+                </div>
               </article>
             ))}
           </div>
@@ -611,6 +524,72 @@ export default async function AuditSummaryPage({
       </section>
     </AdminShell>
   );
+}
+
+type EvidenceSummaryRow = {
+  id: string;
+  attachments: string[];
+  question: {
+    clause: string;
+    title: string | null;
+    question: string;
+  };
+};
+
+function groupEvidenceRowsByObjective(rows: EvidenceSummaryRow[], isCobit: boolean) {
+  const groups = new Map<string, { domain: string; title: string; rows: EvidenceSummaryRow[]; fileCount: number }>();
+
+  rows.forEach((row) => {
+    const objective = getEvidenceObjective(row.question.clause, isCobit);
+    const existing = groups.get(objective.key) ?? {
+      domain: objective.key,
+      title: row.question.title || objective.title,
+      rows: [],
+      fileCount: 0,
+    };
+
+    existing.rows.push(row);
+    existing.fileCount += row.attachments.length;
+    groups.set(objective.key, existing);
+  });
+
+  return Array.from(groups.values()).sort((a, b) => getEvidenceObjectiveOrder(a.domain) - getEvidenceObjectiveOrder(b.domain));
+}
+
+function getEvidenceObjective(clause: string, isCobit: boolean) {
+  if (isCobit) {
+    const match = clause.toUpperCase().match(/^(EDM|APO|BAI|DSS|MEA)\s*0?(\d{1,2})/);
+    if (match) {
+      const objective = `${match[1]}${match[2].padStart(2, "0")}`;
+      return {
+        key: objective,
+        title: `Objective ${objective}`,
+      };
+    }
+  }
+
+  return {
+    key: "KLAUSUL",
+    title: "Klausul Audit",
+  };
+}
+
+function formatEvidenceClause(clause: string, isCobit: boolean) {
+  if (!isCobit) {
+    return clause;
+  }
+
+  return getEvidenceObjective(clause, true).key;
+}
+
+function getEvidenceObjectiveOrder(objective: string) {
+  const match = objective.match(/^(EDM|APO|BAI|DSS|MEA)(\d{2})$/);
+  if (!match) {
+    return 9999;
+  }
+
+  const domainOrder = ["EDM", "APO", "BAI", "DSS", "MEA"].indexOf(match[1]);
+  return domainOrder * 100 + Number(match[2]);
 }
 
 function EvidenceLinks({
@@ -712,219 +691,260 @@ function getChartColor(className: string) {
 function CobitSummarySection({
   summary,
   companyName,
+  auditDescription,
 }: {
   summary: CobitAuditSummary;
   companyName: string;
+  auditDescription: string | null;
 }) {
-  const adoptedObjectives = summary.objectives.length;
-  const adoptedDomains = summary.domains.filter((domain) => domain.objectiveCount > 0).length;
-  const topObjectives = [...summary.objectives]
-    .sort((a, b) => b.achievedLevel - a.achievedLevel || b.averageScore - a.averageScore)
-    .slice(0, 8);
+  const processCount = summary.objectives.length;
+  const maturityScore = Number(summary.overallCapability.toFixed(1));
+  const maturityLabel = getMaturityLabel(maturityScore);
+  const baseline = summary.baseline;
+  const allScore = averageLevel(summary.objectives);
+  const scoreRows = getCobitMaturityScoreRows({
+    description: auditDescription,
+    processCount,
+    score: allScore,
+    baseline,
+  });
+  const scopeSource = getCobitScopeSource(auditDescription, processCount);
 
   return (
-    <>
-      <section className="df-summary-shell">
-        <div className="section-heading">
-          <div>
-            <h2>Summary Capability COBIT</h2>
-            <p>Hasil capability berdasarkan jawaban Ya/Tidak auditee untuk {companyName}.</p>
-          </div>
-        </div>
+    <section className="cobit-maturity-section users-panel">
+      <h2 className="cobit-maturity-headline">
+        Skor <em>IT Maturity</em> {companyName} dari {processCount} proses adalah{" "}
+        <strong>{formatDecimal(maturityScore)} ({maturityLabel})</strong>
+      </h2>
 
-        <div className="df-summary-cards">
-          <article className="df-summary-card level-card">
-            <span>Overall Capability</span>
-            <strong>{summary.overallCapability.toFixed(2)}</strong>
-          </article>
-          <article className="df-summary-card">
-            <span>Baseline</span>
-            <strong>{summary.baseline}</strong>
-          </article>
-          <article className="df-summary-card">
-            <span>Overall Score</span>
-            <strong>{summary.overallScore}%</strong>
-            <small>Rata-rata domain aktif</small>
-          </article>
-          <article className="df-summary-card">
-            <span>Jawaban Auditee</span>
-            <strong>{summary.answered}/{summary.total}</strong>
-          </article>
-          <article className="df-summary-card">
-            <span>Domain Diadopsi</span>
-            <strong>{adoptedObjectives} objective</strong>
-          </article>
-          <article className="df-summary-card">
-            <span>Area COBIT</span>
-            <strong>{adoptedDomains} area</strong>
-          </article>
-        </div>
+      <div className="cobit-maturity-grid">
+        <article className="cobit-maturity-radar-card">
+          <h3>Capability Level</h3>
+          <CobitMaturityRadar summary={summary} />
+        </article>
 
-        <div className="df-summary-grid chart-wide-grid">
-          <article className="users-panel df-summary-panel">
-            <div className="section-heading">
-              <div>
-                <h2>Domain Spider Chart</h2>
-                <p>Capability actual dibandingkan baseline.</p>
-              </div>
-            </div>
-            <CobitSpiderChart summary={summary} />
-          </article>
-
-          <article className="users-panel df-summary-panel">
-            <div className="section-heading">
-              <div>
-                <h2>Capability Per Domain</h2>
-                <p>Rata-rata achieved level setiap domain.</p>
-              </div>
-            </div>
-            <div className="objective-bar-chart">
-              {summary.domains.map((domain) => (
-                <div className="objective-bar-row" key={domain.domain}>
-                  <span>{domain.domain}</span>
-                  <div className="objective-bar-track">
-                    <i style={{ width: `${Math.min(100, (domain.achievedLevel / 5) * 100)}%` }} />
-                    <b>{domain.achievedLevel.toFixed(2)}</b>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section className="users-panel">
-        <div className="section-heading">
-          <div>
-            <h2>Capability Level Achievement</h2>
-            <p>Nilai F, L, P, N dihitung dari rata-rata pertanyaan per level. Level tanpa pertanyaan ditandai N/A.</p>
-          </div>
-        </div>
-
-        <div className="table-wrap">
-          <table className="user-table cobit-capability-table">
+        <aside className="cobit-maturity-side">
+          <table className="cobit-maturity-score-table">
+            <caption>Skor Kematangan TI {companyName} tahun 2025</caption>
             <thead>
               <tr>
-                <th>Process</th>
-                {[1, 2, 3, 4, 5].map((level) => (
-                  <th key={level}>Level {level}</th>
-                ))}
-                <th>Capability Level Achieved</th>
+                <th></th>
+                <th>Hasil</th>
+                <th>Target</th>
+                <th><em>Gap</em></th>
               </tr>
             </thead>
             <tbody>
-              {summary.objectives.map((objective) => (
-                <tr key={objective.objective}>
-                  <td>
-                    <strong>{objective.objective}</strong>
-                    <span>{objective.title}</span>
-                  </td>
-                  {objective.levels.map((level) => (
-                    <td key={level.level}>
-                      <strong>{level.rating}</strong>
-                      <span>{level.applicable ? `${level.percentage}% (${level.yes}/${level.total})` : "N/A"}</span>
-                      {level.applicable ? <span>Y: {level.yes} / N: {level.no}</span> : null}
+              {scoreRows.map((row) => (
+                <tr key={row.label}>
+                  <th>{row.label}</th>
+                  <td>{formatDecimal(row.score)}</td>
+                  <td>{formatDecimal(row.baseline)}</td>
+                  <td>{formatGap(row.score - row.baseline)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="cobit-maturity-source-note">
+            Sumber hasil: {scopeSource}
+          </p>
+
+          <div className="cobit-maturity-result-card">
+            <h3>Skor kematangan TI dari {processCount} proses</h3>
+            <div>
+              <strong>{formatDecimal(maturityScore)}</strong>
+              <span>({maturityLabel})</span>
+              <p>{getMaturityDescription(maturityScore)}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div className="section-heading cobit-level-detail-heading">
+        <div>
+          <h2>Detail skor level setiap proses</h2>
+          <p>Skor level diambil dari capability level achieved per objective.</p>
+        </div>
+      </div>
+      <div className="table-wrap cobit-process-score-scroll">
+        <table className="user-table cobit-process-score-table">
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>No</th>
+              <th>Kode</th>
+              <th>Nama Proses</th>
+              <th>Level 1</th>
+              <th>Level 2</th>
+              <th>Level 3</th>
+              <th>Level 4</th>
+              <th>Level 5</th>
+              <th>Skor Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.objectives.map((objective, index) => (
+              <tr key={objective.objective}>
+                <td>{getCobitDomainTitle(objective.domain || objective.objective.slice(0, 3))}</td>
+                <td>{index + 1}</td>
+                <td><strong>{objective.objective}</strong></td>
+                <td><em>{objective.title}</em></td>
+                {COBIT_LEVELS.map((levelNumber) => {
+                  const level = objective.levels.find((item) => item.level === levelNumber);
+
+                  return (
+                    <td key={levelNumber}>
+                      {level?.applicable ? `${level.rating} ${level.percentage}%` : "N/A"}
                     </td>
-                  ))}
-                  <td>
-                    <strong>{objective.achievedLevel}</strong>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="cobit-level-average-wrap">
-          <table className="user-table cobit-level-average-table">
-            <thead>
-              <tr>
-                <th>Process</th>
-                <th>Rata-rata Semua Level</th>
+                  );
+                })}
+                <td><strong>{objective.achievedLevel}</strong></td>
               </tr>
-            </thead>
-            <tbody>
-              {summary.objectives.map((objective) => (
-                <tr key={`${objective.objective}-level-average`}>
-                  <td>{objective.objective}</td>
-                  <td>
-                    <strong>{objective.total > 0 ? getCobitRating(objective.averageScore) : "N/A"}</strong>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="users-panel">
-        <div className="section-heading">
-          <div>
-            <h2>Top Capability Objectives</h2>
-            <p>Objective dengan achievement tertinggi sebagai ringkasan cepat.</p>
-          </div>
-        </div>
-        <div className="domain-detail-grid">
-          {topObjectives.map((objective) => (
-            <article className="domain-metric" key={objective.objective}>
-              <span>{objective.objective}</span>
-              <strong>Level {objective.achievedLevel}</strong>
-              <p>{objective.averageScore}% - {getCobitRating(objective.averageScore)}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-    </>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
-function CobitSpiderChart({ summary }: { summary: CobitAuditSummary }) {
-  const size = 260;
+function getCobitDomainTitle(domain: string) {
+  if (domain === "EDM") return "Evaluate, Direct and Monitor (EDM)";
+  if (domain === "APO") return "Align, Plan and Organize (APO)";
+  if (domain === "BAI") return "Build, Acquire and Implement (BAI)";
+  if (domain === "DSS") return "Deliver, Service and Support (DSS)";
+  return "Monitor, Evaluate and Assess (MEA)";
+}
+
+function getCobitMaturityScoreRows({
+  description,
+  processCount,
+  score,
+  baseline,
+}: {
+  description: string | null;
+  processCount: number;
+  score: number;
+  baseline: number;
+}) {
+  const scopeLabel = getCobitScopeLabelFromDescription(description, processCount);
+
+  return [
+    {
+      label: `${scopeLabel} (${processCount} proses)`,
+      score,
+      baseline,
+    },
+  ];
+}
+
+function getCobitScopeSource(description: string | null, processCount: number) {
+  const scopeLabel = getCobitScopeLabelFromDescription(description, processCount);
+  const designFactorId = String(description ?? "").match(/Design Factor Assessment ID:\s*([^\n]+)/i)?.[1]?.trim();
+
+  if (designFactorId) {
+    return `${scopeLabel}, dari Design Factor Assessment ${designFactorId}`;
+  }
+
+  return scopeLabel;
+}
+
+function getCobitScopeLabelFromDescription(description: string | null, processCount: number) {
+  const match = String(description ?? "").match(/Scope Audit COBIT:\s*(.+)/i);
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+  if (processCount <= 24) return "24 Domain BUMN";
+  if (processCount >= 39) return "Seluruh Domain COBIT";
+  return "Scope Audit COBIT";
+}
+
+function CobitMaturityRadar({ summary }: { summary: CobitAuditSummary }) {
+  const size = 560;
   const center = size / 2;
-  const radius = 92;
-  const domains = summary.domains;
-  const actualPoints = domains.map((domain, index) =>
-    polarPoint(index, domains.length, (domain.achievedLevel / 5) * radius, center),
+  const radius = 205;
+  const maxLevel = 5;
+  const objectives = summary.objectives;
+  const actualPoints = objectives.map((objective, index) =>
+    polarPoint(index, objectives.length, (objective.achievedLevel / maxLevel) * radius, center),
   );
-  const baselinePoints = domains.map((_, index) =>
-    polarPoint(index, domains.length, (summary.baseline / 5) * radius, center),
+  const targetPoints = objectives.map((_, index) =>
+    polarPoint(index, objectives.length, (summary.baseline / maxLevel) * radius, center),
   );
 
   return (
-    <div className="objective-radar-wrap cobit-spider-wrap">
-      <svg viewBox={`0 0 ${size} ${size}`} role="img" aria-label="COBIT capability spider chart">
-        {[0.2, 0.4, 0.6, 0.8, 1].map((scale) => {
-          const points = domains.map((_, index) => polarPoint(index, domains.length, radius * scale, center));
+    <div className="cobit-maturity-radar-wrap">
+      <div className="cobit-maturity-radar-legend">
+        <span><i className="baseline" />Baseline/Target</span>
+        <span><i className="actual" />Skor Level</span>
+      </div>
+      <svg viewBox={`0 0 ${size} ${size}`} role="img" aria-label="COBIT capability level radar">
+        {[1, 2, 3, 4, 5].map((level) => {
+          const ringRadius = (level / maxLevel) * radius;
+          const points = objectives.map((_, index) => polarPoint(index, objectives.length, ringRadius, center));
           return (
-            <polygon
-              fill="none"
-              key={scale}
-              points={points.map(pointToString).join(" ")}
-              stroke="#dce7f5"
-              strokeWidth="1"
-            />
+            <g key={level}>
+              <polygon fill="none" points={points.map(pointToString).join(" ")} stroke="#d9dde2" strokeWidth="1" />
+              <text x={center - 8} y={center - ringRadius + 5} textAnchor="end">{level}</text>
+            </g>
           );
         })}
-        {domains.map((domain, index) => {
-          const end = polarPoint(index, domains.length, radius, center);
-          const label = polarPoint(index, domains.length, radius + 22, center);
+        {objectives.map((objective, index) => {
+          const end = polarPoint(index, objectives.length, radius, center);
+          const label = polarPoint(index, objectives.length, radius + 24, center);
           return (
-            <g key={domain.domain}>
-              <line x1={center} y1={center} x2={end.x} y2={end.y} stroke="#e4ecf6" />
+            <g key={objective.objective}>
+              <line x1={center} y1={center} x2={end.x} y2={end.y} stroke="#edf1f6" />
               <text x={label.x} y={label.y} textAnchor="middle" dominantBaseline="middle">
-                {domain.domain}
+                {objective.objective}
               </text>
             </g>
           );
         })}
-        <polygon fill="rgba(28, 87, 223, 0.16)" points={actualPoints.map(pointToString).join(" ")} stroke="#1c57df" strokeWidth="2" />
-        <polygon fill="rgba(236, 72, 153, 0.08)" points={baselinePoints.map(pointToString).join(" ")} stroke="#ec4899" strokeWidth="2" />
+        <polygon fill="rgba(111, 181, 29, 0.12)" points={actualPoints.map(pointToString).join(" ")} stroke="#6fb51d" strokeWidth="3" />
+        {actualPoints.map((point, index) => <circle key={`actual-${index}`} cx={point.x} cy={point.y} r="4" fill="#6fb51d" />)}
+        <polygon fill="none" points={targetPoints.map(pointToString).join(" ")} stroke="#d34848" strokeWidth="3.5" />
+        {targetPoints.map((point, index) => <circle key={`target-${index}`} cx={point.x} cy={point.y} r="4" fill="#d34848" />)}
       </svg>
-      <div className="df-radar-legend">
-        <span><i /> Actual Capability</span>
-        <span><i className="baseline" /> Baseline</span>
-      </div>
     </div>
   );
+}
+
+function averageLevel(objectives: CobitAuditSummary["objectives"]) {
+  if (objectives.length === 0) {
+    return 0;
+  }
+
+  return Number((objectives.reduce((sum, objective) => sum + objective.achievedLevel, 0) / objectives.length).toFixed(2));
+}
+
+function formatDecimal(value: number) {
+  return value.toLocaleString("id-ID", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 1,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatGap(value: number) {
+  const formatted = formatDecimal(Math.abs(Number(value.toFixed(2))));
+  return `${value >= 0 ? "+" : "-"}${formatted}`;
+}
+
+function getMaturityLabel(score: number) {
+  if (score >= 5) return "Optimizing";
+  if (score >= 4) return "Quantitatively Managed";
+  if (score >= 3) return "Defined";
+  if (score >= 2) return "Managed";
+  if (score >= 1) return "Initial";
+  return "Incomplete";
+}
+
+function getMaturityDescription(score: number) {
+  if (score >= 4) return "Process is measured and controlled across the enterprise.";
+  if (score >= 3) return "Enterprise wide standards provide guidance across the enterprise.";
+  if (score >= 2) return "Process is planned, monitored, and repeatable.";
+  if (score >= 1) return "Process is performed but still ad hoc.";
+  return "Process capability is not yet established.";
 }
 
 function polarPoint(index: number, total: number, radius: number, center: number) {

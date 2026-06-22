@@ -3,7 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Download, Save, Send } from "lucide-react";
+import { Download, Info, Save, Send, X } from "lucide-react";
 import { Toast } from "@/components/toast";
 import {
   calculateDf01Results,
@@ -937,6 +937,10 @@ function DesignFactorSummaryDashboard({
   selectedObjective: string;
   onSelectObjective: (objective: string) => void;
 }) {
+  const [domainModal, setDomainModal] = useState<{
+    title: string;
+    rows: SummaryRow[];
+  } | null>(null);
   const sortedRows = [...rows].sort((a, b) => a.rank - b.rank);
   const highest = sortedRows[0] ?? rows[0];
   const adoptedRows = sortedRows.filter((row) => row.suggestedCapability >= 2);
@@ -1007,12 +1011,12 @@ function DesignFactorSummaryDashboard({
                     rows: levelCounts.map((item) => [`Level ${item.level}`, `${item.count} domain`]),
                   },
                   {
-                    title: "Initial Summary - Governance and Management Objectives",
+                    title: "Step 2: Initial Scope of the Governance System",
                     columns: ["Domain", "Domain Name", "Initial Scope"],
                     rows: sortedRows.map((row) => [row.objective, row.domainName, formatNumber(row.initialScope)]),
                   },
                   {
-                    title: "Governance and Management Objectives Importance",
+                    title: "Step 3: Refined Scope of the Governance System",
                     columns: ["Domain", "Domain Name", "Priority", "Capability", "Rank"],
                     rows: sortedRows.map((row) => [
                       row.objective,
@@ -1086,8 +1090,16 @@ function DesignFactorSummaryDashboard({
 
       <div className="df-summary-cards">
         <SummaryCard label="Total Governance & Management Objectives" value={String(rows.length)} />
-        <SummaryCard label="Domain Diadopsi Level 2-4" value={`${adoptedRows.length} domain`} />
-        <SummaryCard label="Area Fokus Level 4" value={`${focusRows.length} domain`} />
+        <SummaryCard
+          label="Domain Diadopsi Level 2-4"
+          value={`${adoptedRows.length} domain`}
+          onInfo={() => setDomainModal({ title: "Domain Diadopsi Level 2-4", rows: adoptedRows })}
+        />
+        <SummaryCard
+          label="Area Fokus Level 4"
+          value={`${focusRows.length} domain`}
+          onInfo={() => setDomainModal({ title: "Area Fokus Level 4", rows: focusRows })}
+        />
         <article className="df-summary-card level-card">
           <span>Level Distribution</span>
           {levelCounts.map((item) => (
@@ -1099,41 +1111,27 @@ function DesignFactorSummaryDashboard({
       <div className="df-summary-grid chart-wide-grid">
         <article className="users-panel df-summary-panel">
           <div className="section-heading compact-heading">
-            <h2>Initial Summary - Governance and Management Objectives</h2>
+            <h2>Step 2: Initial Scope of the Governance System</h2>
+            <p>Skor awal Governance/Management Objectives dari DF01-DF04.</p>
           </div>
-          <ObjectiveDivergingBarChart rows={rows} valueKey="initialScope" onSelectObjective={onSelectObjective} />
+          <div className="df-summary-scroll">
+            <ObjectiveDivergingBarChart rows={rows} valueKey="initialScope" onSelectObjective={onSelectObjective} />
+          </div>
         </article>
 
         <article className="users-panel df-summary-panel">
           <div className="section-heading compact-heading">
-            <h2>Governance and Management Objectives Importance (All Design Factors)</h2>
+            <h2>Step 3: Refined Scope of the Governance System</h2>
+            <p>Skor final setelah refinement seluruh Design Factors DF01-DF10.</p>
           </div>
-          <ObjectiveImportanceChart rows={rows} onSelectObjective={onSelectObjective} />
+          <div className="df-summary-scroll">
+            <ObjectiveDivergingBarChart rows={rows} valueKey="rawScore" onSelectObjective={onSelectObjective} />
+          </div>
         </article>
       </div>
 
-      <div className="df-summary-grid priority-full-grid">
-        <article className="users-panel df-summary-panel">
-          <div className="section-heading compact-heading">
-            <h2>Domain Diadopsi Level 2-4</h2>
-            <p>Domain dengan Suggested Capability Level 2, 3, dan 4.</p>
-          </div>
-          <div className="priority-bars">
-            {adoptedRows.length > 0 ? (
-              adoptedRows.map((row) => (
-                <button key={row.objective} type="button" onClick={() => onSelectObjective(row.objective)}>
-                  <span>{row.objective}</span>
-                  <div className="chart-track">
-                    <i className={getPriorityClass(row.priorityScore)} style={{ width: `${row.priorityScore}%` }} />
-                  </div>
-                  <strong>{row.priorityScore}</strong>
-                </button>
-              ))
-            ) : (
-              <p className="empty-focus-note">Belum ada domain yang masuk Level 2, 3, atau 4.</p>
-            )}
-          </div>
-        </article>
+      <div className="df-summary-grid df-takeaway-grid">
+        <KeyTakeawaysPanel rows={rows} />
       </div>
 
       <article className="users-panel df-summary-panel">
@@ -1192,16 +1190,114 @@ function DesignFactorSummaryDashboard({
           </table>
         </div>
       </article>
+
+      {domainModal ? (
+        <DomainInfoModal
+          title={domainModal.title}
+          rows={domainModal.rows}
+          onClose={() => setDomainModal(null)}
+          onSelectObjective={(objective) => {
+            onSelectObjective(objective);
+            setDomainModal(null);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryCard({ label, value, onInfo }: { label: string; value: string; onInfo?: () => void }) {
   return (
     <article className="df-summary-card">
-      <span>{label}</span>
+      <div className="df-summary-card-title">
+        <span>{label}</span>
+        {onInfo ? (
+          <button type="button" onClick={onInfo} aria-label={`Lihat detail ${label}`}>
+            <Info size={16} aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
       <strong>{value}</strong>
     </article>
+  );
+}
+
+function KeyTakeawaysPanel({ rows }: { rows: SummaryRow[] }) {
+  const sortedByPriority = [...rows].sort((a, b) => b.priorityScore - a.priorityScore || a.rank - b.rank);
+  const topRows = sortedByPriority.filter((row) => row.priorityScore === sortedByPriority[0]?.priorityScore).slice(0, 3);
+  const negativeRows = rows.filter((row) => row.rawScore < 0).sort((a, b) => a.rawScore - b.rawScore).slice(0, 3);
+  const lowRows = [...rows].filter((row) => row.suggestedCapability === 1).sort((a, b) => a.priorityScore - b.priorityScore).slice(0, 3);
+  const focusRows = rows.filter((row) => row.suggestedCapability === 4);
+  const adoptedRows = rows.filter((row) => row.suggestedCapability >= 2);
+  const constrainedRows = negativeRows.length > 0 ? negativeRows : lowRows;
+
+  return (
+    <article className="users-panel df-keytakeaway-panel">
+      <div className="df-keytakeaway-title">
+        <h2>Key Takeaways</h2>
+      </div>
+      <ul>
+        {constrainedRows.length > 0 ? (
+          <li>
+            {formatObjectiveList(constrainedRows)} memiliki nilai prioritas paling rendah
+            {negativeRows.length > 0 ? " atau raw score negatif" : ""}, sehingga belum menjadi fokus utama dalam scope Design Factor.
+          </li>
+        ) : null}
+        {topRows.length > 0 ? (
+          <li>
+            {formatObjectiveList(topRows)} menunjukkan skor prioritas tertinggi ({topRows[0].priorityScore}) dan menjadi kandidat utama untuk perhatian tata kelola.
+          </li>
+        ) : null}
+        <li>
+          Terdapat {adoptedRows.length} objective diadopsi pada Level 2-4, dengan {focusRows.length} objective berada pada Area Fokus Level 4.
+        </li>
+      </ul>
+    </article>
+  );
+}
+
+function formatObjectiveList(rows: SummaryRow[]) {
+  return rows.map((row) => `${row.objective} (${row.domainName})`).join(", ");
+}
+
+function DomainInfoModal({
+  title,
+  rows,
+  onClose,
+  onSelectObjective,
+}: {
+  title: string;
+  rows: SummaryRow[];
+  onClose: () => void;
+  onSelectObjective: (objective: string) => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="modal-panel df-domain-modal" role="dialog" aria-modal="true" aria-labelledby="df-domain-modal-title" onClick={(event) => event.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose} aria-label="Tutup">
+          <X size={18} aria-hidden="true" />
+        </button>
+        <div className="section-heading compact-heading">
+          <div>
+            <h2 id="df-domain-modal-title">{title}</h2>
+            <p>{rows.length} domain ditemukan. Klik domain untuk membuka detailnya.</p>
+          </div>
+        </div>
+        {rows.length > 0 ? (
+          <div className="df-domain-modal-list">
+            {rows.map((row) => (
+              <button key={row.objective} type="button" onClick={() => onSelectObjective(row.objective)}>
+                <strong>{row.objective}</strong>
+                <span>{row.domainName}</span>
+                <i>Level {row.suggestedCapability}</i>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-focus-note">Belum ada domain pada kategori ini.</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1237,7 +1333,14 @@ function ObjectiveDivergingBarChart({
             <span>{row.objective} - {row.domainName}</span>
             <div className="objective-bar-track">
               <i className={displayValue >= 0 ? "positive" : "negative"} style={style} />
-              <b style={displayValue >= 0 ? { left: `calc(50% + ${width}% - 34px)` } : { left: `calc(${50 - width}% + 8px)` }}>
+              <b
+                className={displayValue >= 0 ? "positive-label" : "negative-label"}
+                style={
+                  displayValue >= 0
+                    ? { left: `calc(50% + ${width}%)`, transform: "translateX(-100%)" }
+                    : { left: `calc(${50 - width}% + 4px)` }
+                }
+              >
                 {formatNumber(value)}
               </b>
             </div>
