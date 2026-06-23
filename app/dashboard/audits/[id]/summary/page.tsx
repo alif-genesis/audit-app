@@ -792,7 +792,11 @@ function CobitSummarySection({
 
                   return (
                     <td key={levelNumber}>
-                      {level?.applicable ? `${level.rating} ${level.percentage}%` : "N/A"}
+                      {level?.applicable ? (
+                        <CapabilityLevelScore rating={level.rating} percentage={level.percentage} />
+                      ) : (
+                        <CapabilityLevelScore rating="N/A" />
+                      )}
                     </td>
                   );
                 })}
@@ -803,6 +807,18 @@ function CobitSummarySection({
         </table>
       </div>
     </section>
+  );
+}
+
+function CapabilityLevelScore({ rating, percentage }: { rating: string; percentage?: number }) {
+  const normalizedRating = rating.toUpperCase();
+  const className = normalizedRating === "N/A" ? "na" : normalizedRating.toLowerCase();
+
+  return (
+    <span className={`cobit-level-score ${className}`}>
+      <span className="cobit-level-rating">{normalizedRating}</span>
+      {percentage !== undefined ? <span className="cobit-level-value">{percentage}%</span> : null}
+    </span>
   );
 }
 
@@ -858,9 +874,10 @@ function getCobitScopeLabelFromDescription(description: string | null, processCo
 }
 
 function CobitMaturityRadar({ summary }: { summary: CobitAuditSummary }) {
-  const size = 560;
+  const size = 720;
   const center = size / 2;
-  const radius = 205;
+  const radius = 260;
+  const labelRadius = radius + 44;
   const maxLevel = 5;
   const objectives = summary.objectives;
   const actualPoints = objectives.map((objective, index) =>
@@ -889,7 +906,7 @@ function CobitMaturityRadar({ summary }: { summary: CobitAuditSummary }) {
         })}
         {objectives.map((objective, index) => {
           const end = polarPoint(index, objectives.length, radius, center);
-          const label = polarPoint(index, objectives.length, radius + 24, center);
+          const label = polarPoint(index, objectives.length, labelRadius, center);
           return (
             <g key={objective.objective}>
               <line x1={center} y1={center} x2={end.x} y2={end.y} stroke="#edf1f6" />
