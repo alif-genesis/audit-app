@@ -1749,6 +1749,33 @@ select:disabled {
   white-space: nowrap;
 }
 
+.evidence-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.evidence-delete-button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #ffd2dc;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #c8193f;
+  background: #fff5f7;
+  cursor: pointer;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.evidence-delete-button:hover {
+  border-color: #f59aae;
+  background: #ffeaf0;
+}
+
 .evidence-pending-row td {
   background: #f8fbff;
 }

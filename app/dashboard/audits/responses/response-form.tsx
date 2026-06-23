@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ExternalLink, Plus } from "lucide-react";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import type { Audit, AuditQuestion, AuditResponse } from "@prisma/client";
 import { CustomSelect } from "@/components/custom-select";
 import { Toast } from "@/components/toast";
@@ -397,6 +397,46 @@ export function AuditResponseForm({
     }
   };
 
+  const deleteEvidenceFile = async (questionId: string, path: string) => {
+    if (!window.confirm("Hapus file evidence ini?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/audits/${audit.id}/responses`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId, path }),
+      });
+      const data = (await response.json().catch(() => null)) as { response?: LiveResponse; error?: string } | null;
+
+      if (!response.ok || !data?.response) {
+        setClientToast({
+          type: "error",
+          message: data?.error ?? "File evidence gagal dihapus.",
+          id: Date.now(),
+        });
+        return;
+      }
+
+      setLiveResponses((current) => ({
+        ...current,
+        [data.response!.questionId]: data.response!,
+      }));
+      setClientToast({
+        type: "success",
+        message: "File evidence berhasil dihapus.",
+        id: Date.now(),
+      });
+    } catch {
+      setClientToast({
+        type: "error",
+        message: "File evidence gagal dihapus.",
+        id: Date.now(),
+      });
+    }
+  };
+
   const confirmNavigation = () => {
     if (!hasUnsavedChanges) {
       return true;
@@ -672,9 +712,11 @@ export function AuditResponseForm({
                     }}
                   />
                   <EvidenceUploadTable
+                    questionId={question.id}
                     evidenceFiles={response?.evidenceFiles}
                     attachments={response?.attachments ?? []}
                     pendingFiles={pendingEvidenceFiles[question.id] ?? []}
+                    onDelete={deleteEvidenceFile}
                   />
                 </label>
               </div>
@@ -688,13 +730,17 @@ export function AuditResponseForm({
 }
 
 function EvidenceUploadTable({
+  questionId,
   evidenceFiles,
   attachments,
   pendingFiles,
+  onDelete,
 }: {
+  questionId: string;
   evidenceFiles?: EvidenceItem[];
   attachments: string[];
   pendingFiles: PendingEvidenceItem[];
+  onDelete: (questionId: string, path: string) => void;
 }) {
   const rows: EvidenceItem[] =
     evidenceFiles && evidenceFiles.length > 0
@@ -736,10 +782,20 @@ function EvidenceUploadTable({
               <td>{file.name}</td>
               <td>{typeof file.size === "number" ? formatFileSize(file.size) : "-"}</td>
               <td>
-                <a href={file.path} target="_blank" rel="noreferrer">
-                  <ExternalLink size={14} aria-hidden="true" />
-                  Buka
-                </a>
+                <div className="evidence-action-buttons">
+                  <a href={file.path} target="_blank" rel="noreferrer">
+                    <ExternalLink size={14} aria-hidden="true" />
+                    Buka
+                  </a>
+                  <button
+                    className="evidence-delete-button"
+                    type="button"
+                    onClick={() => onDelete(questionId, file.path)}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                    Hapus
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

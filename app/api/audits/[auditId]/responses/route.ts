@@ -353,3 +353,129 @@ export async function POST(request: Request, context: RouteContext) {
     },
   });
 }
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser?.isActive) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { auditId } = await context.params;
+  const body = await request.json().catch(() => null);
+  const questionId = String(body?.questionId || "").trim();
+  const path = String(body?.path || "").trim();
+
+  if (!questionId || !path) {
+    return NextResponse.json({ error: "Invalid evidence payload" }, { status: 400 });
+  }
+
+  const audit = await prisma.audit.findUnique({
+    where: { id: auditId },
+    select: {
+      id: true,
+      assignments: {
+        where: { auditeeId: currentUser.id },
+        select: { auditeeId: true },
+      },
+    },
+  });
+
+  if (!audit || audit.assignments.length === 0) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const existing = await prisma.auditResponse.findUnique({
+    where: {
+      auditId_auditeeId_questionId: {
+        auditId,
+        auditeeId: currentUser.id,
+        questionId,
+      },
+    },
+    select: {
+      submittedAt: true,
+      attachments: true,
+    },
+  });
+
+  if (!existing) {
+    return NextResponse.json({ error: "Response not found" }, { status: 404 });
+  }
+
+  if (existing.submittedAt) {
+    return NextResponse.json({ error: "Response already final" }, { status: 409 });
+  }
+
+  const evidenceFile = await prisma.evidenceFile.findFirst({
+    where: {
+      auditId,
+      questionId,
+      uploadedById: currentUser.id,
+      downloadPath: path,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+
+  if (!evidenceFile && !existing.attachments.includes(path)) {
+    return NextResponse.json({ error: "Evidence not found" }, { status: 404 });
+  }
+
+  if (evidenceFile) {
+    await prisma.evidenceFile.update({
+      where: { id: evidenceFile.id },
+      data: { isActive: false },
+    });
+  }
+
+  const response = await prisma.auditResponse.update({
+    where: {
+      auditId_auditeeId_questionId: {
+        auditId,
+        auditeeId: currentUser.id,
+        questionId,
+      },
+    },
+    data: {
+      attachments: existing.attachments.filter((attachment) => attachment !== path),
+    },
+    select: {
+      questionId: true,
+      compliance: true,
+      description: true,
+      attachments: true,
+      submittedAt: true,
+      updatedAt: true,
+      evidenceFiles: {
+        where: { isActive: true },
+        orderBy: { version: "asc" },
+        select: {
+          downloadPath: true,
+          originalName: true,
+          fileSize: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  revalidatePath(`/dashboard/audits/responses/${auditId}`);
+  revalidatePath(`/dashboard/audits/${auditId}/summary`);
+
+  return NextResponse.json({
+    response: {
+      questionId: response.questionId,
+      compliance: response.compliance,
+      description: response.description ?? "",
+      attachments: response.attachments,
+      evidenceFiles: response.evidenceFiles.map((file) => ({
+        path: file.downloadPath,
+        name: file.originalName,
+        size: file.fileSize,
+        uploadedAt: file.createdAt.toISOString(),
+      })),
+      submittedAt: response.submittedAt?.toISOString() ?? null,
+      updatedAt: response.updatedAt.toISOString(),
+    },
+  });
+}
