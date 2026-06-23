@@ -1749,6 +1749,24 @@ select:disabled {
   white-space: nowrap;
 }
 
+.evidence-pending-row td {
+  background: #f8fbff;
+}
+
+.evidence-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #cfe0f5;
+  border-radius: 8px;
+  color: #1768d4;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
 .response-fields {
   margin-top: 16px;
   display: grid;

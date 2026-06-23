@@ -39,6 +39,12 @@ type EvidenceItem = {
   uploadedAt?: string;
 };
 
+type PendingEvidenceItem = {
+  key: string;
+  name: string;
+  size: number;
+};
+
 const initialState: ResponseFormState = {};
 
 export function AuditResponseForm({
@@ -59,8 +65,12 @@ export function AuditResponseForm({
   );
   const autoSaveTimersRef = useRef<Record<string, number>>({});
   const fileQuestionIdsRef = useRef<Set<string>>(new Set());
+  const formRef = useRef<HTMLFormElement>(null);
+  const fileAutoSaveButtonRef = useRef<HTMLButtonElement>(null);
   const [touchedQuestionIds, setTouchedQuestionIds] = useState<Set<string>>(() => new Set());
   const [fileQuestionIds, setFileQuestionIds] = useState<Set<string>>(() => new Set());
+  const [fileSaveRequestId, setFileSaveRequestId] = useState(0);
+  const [pendingEvidenceFiles, setPendingEvidenceFiles] = useState<Record<string, PendingEvidenceItem[]>>({});
   const [liveResponses, setLiveResponses] = useState<Record<string, LiveResponse>>(() =>
     Object.fromEntries(
       questions.map((question) => {
@@ -148,9 +158,22 @@ export function AuditResponseForm({
       setHasUnsavedChanges(false);
       setTouchedQuestionIds(new Set());
       setFileQuestionIds(new Set());
+      setPendingEvidenceFiles({});
       fileQuestionIdsRef.current = new Set();
     }
   }, [state.toast]);
+
+  useEffect(() => {
+    if (fileSaveRequestId === 0) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formRef.current?.requestSubmit(fileAutoSaveButtonRef.current ?? undefined);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [fileSaveRequestId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -303,7 +326,7 @@ export function AuditResponseForm({
         message={visibleToast?.message}
       />
 
-      <form action={formAction} className="audit-response-form">
+      <form ref={formRef} action={formAction} className="audit-response-form">
         <input name="auditId" type="hidden" value={audit.id} />
         {[...new Set([...touchedQuestionIds, ...fileQuestionIds])].map((questionId) => (
           <input
@@ -314,6 +337,17 @@ export function AuditResponseForm({
             readOnly
           />
         ))}
+        <button
+          ref={fileAutoSaveButtonRef}
+          aria-hidden="true"
+          name="intent"
+          value="save"
+          type="submit"
+          tabIndex={-1}
+          style={{ position: "absolute", width: 1, height: 1, padding: 0, opacity: 0, pointerEvents: "none" }}
+        >
+          Simpan evidence
+        </button>
 
         <div className="user-filter audit-filter compact-filter">
           <CustomSelect
@@ -534,9 +568,20 @@ export function AuditResponseForm({
                     name={`supportingFiles-${question.id}`}
                     type="file"
                     multiple
-                    onChange={() => {
+                    onChange={(event) => {
+                      const selectedFiles = Array.from(event.currentTarget.files ?? []);
                       setHasUnsavedChanges(true);
                       fileQuestionIdsRef.current = new Set(fileQuestionIdsRef.current).add(question.id);
+                      if (selectedFiles.length > 0) {
+                        setPendingEvidenceFiles((current) => ({
+                          ...current,
+                          [question.id]: selectedFiles.map((file) => ({
+                            key: `${file.name}-${file.size}-${file.lastModified}`,
+                            name: file.name,
+                            size: file.size,
+                          })),
+                        }));
+                      }
                       setFileQuestionIds((current) => {
                         const next = new Set(current);
                         next.add(question.id);
@@ -548,9 +593,14 @@ export function AuditResponseForm({
                         return next;
                       });
                       hideCurrentToast();
+                      setFileSaveRequestId(Date.now());
                     }}
                   />
-                  <EvidenceUploadTable evidenceFiles={response?.evidenceFiles} attachments={response?.attachments ?? []} />
+                  <EvidenceUploadTable
+                    evidenceFiles={response?.evidenceFiles}
+                    attachments={response?.attachments ?? []}
+                    pendingFiles={pendingEvidenceFiles[question.id] ?? []}
+                  />
                 </label>
               </div>
             </div>
@@ -565,9 +615,11 @@ export function AuditResponseForm({
 function EvidenceUploadTable({
   evidenceFiles,
   attachments,
+  pendingFiles,
 }: {
   evidenceFiles?: EvidenceItem[];
   attachments: string[];
+  pendingFiles: PendingEvidenceItem[];
 }) {
   const rows: EvidenceItem[] =
     evidenceFiles && evidenceFiles.length > 0
@@ -577,7 +629,7 @@ function EvidenceUploadTable({
           name: getEvidenceFileName(path),
         }));
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && pendingFiles.length === 0) {
     return <small className="field-hint">Belum ada file evidence tersimpan.</small>;
   }
 
@@ -593,9 +645,19 @@ function EvidenceUploadTable({
           </tr>
         </thead>
         <tbody>
+          {pendingFiles.map((file, index) => (
+            <tr className="evidence-pending-row" key={`pending-${file.key}`}>
+              <td>{index + 1}</td>
+              <td>{file.name}</td>
+              <td>{formatFileSize(file.size)}</td>
+              <td>
+                <span className="evidence-pending-badge">Menyimpan</span>
+              </td>
+            </tr>
+          ))}
           {rows.map((file, index) => (
             <tr key={file.path}>
-              <td>{index + 1}</td>
+              <td>{pendingFiles.length + index + 1}</td>
               <td>{file.name}</td>
               <td>{typeof file.size === "number" ? formatFileSize(file.size) : "-"}</td>
               <td>
