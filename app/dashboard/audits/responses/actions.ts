@@ -5,7 +5,6 @@ import { ComplianceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { writeActivityLog } from "@/lib/activity-log";
-import { MAX_EVIDENCE_FILES, saveSupportingFiles } from "@/lib/audit-evidence-upload";
 
 export type ResponseFormState = {
   toast?: {
@@ -140,17 +139,12 @@ export async function submitAuditResponseAction(
       },
     });
     const savedMapForDiff = new Map(savedResponsesForDiff.map((response) => [response.questionId, response]));
-    const hasFileUploads = responseUpdates.some((response) =>
-      formData
-        .getAll(`supportingFiles-${response.questionId}`)
-        .some((file) => file instanceof File && file.size > 0),
-    );
     const hasResponseChanges = responseUpdates.some((response) => {
       const saved = savedMapForDiff.get(response.questionId);
       return !saved || saved.compliance !== response.compliance || (saved.description ?? "") !== response.description;
     });
 
-    if (!isSubmit && !hasResponseChanges && !hasFileUploads) {
+    if (!isSubmit && !hasResponseChanges) {
       return withToastId({
         toast: {
           type: "success",
@@ -186,53 +180,6 @@ export async function submitAuditResponseAction(
 
     // Save only rows that were changed in this browser session.
     for (const resp of isSubmit ? [] : responseUpdates) {
-      const files = formData
-        .getAll(`supportingFiles-${resp.questionId}`)
-        .filter((file): file is File => file instanceof File && file.size > 0);
-      const uploadedFiles =
-        files.length > 0
-          ? await saveSupportingFiles({
-              auditId,
-              questionId: resp.questionId,
-              auditeeId: currentUser.id,
-              uploadedById: currentUser.id,
-              files,
-            })
-          : null;
-
-      if (uploadedFiles && "error" in uploadedFiles) {
-        return withToastId({ toast: { type: "error", message: uploadedFiles.error } });
-      }
-
-      const existingResponse = uploadedFiles
-        ? await prisma.auditResponse.findUnique({
-            where: {
-              auditId_auditeeId_questionId: {
-                auditId: resp.auditId,
-                auditeeId: resp.auditeeId,
-                questionId: resp.questionId,
-              },
-            },
-            select: { attachments: true },
-          })
-        : null;
-      const mergedAttachments = uploadedFiles
-        ? [...(existingResponse?.attachments ?? []), ...uploadedFiles.paths]
-        : [];
-      const activeAttachments = mergedAttachments.slice(-MAX_EVIDENCE_FILES);
-      const replacedAttachments = mergedAttachments.slice(0, Math.max(0, mergedAttachments.length - MAX_EVIDENCE_FILES));
-
-      if (replacedAttachments.length > 0) {
-        await prisma.evidenceFile.updateMany({
-          where: {
-            auditId: resp.auditId,
-            questionId: resp.questionId,
-            downloadPath: { in: replacedAttachments },
-          },
-          data: { isActive: false },
-        });
-      }
-
       await prisma.auditResponse.update({
         where: {
           auditId_auditeeId_questionId: {
@@ -244,7 +191,6 @@ export async function submitAuditResponseAction(
         data: {
           compliance: resp.compliance,
           description: resp.description,
-          ...(uploadedFiles ? { attachments: activeAttachments } : {}),
         },
       });
     }

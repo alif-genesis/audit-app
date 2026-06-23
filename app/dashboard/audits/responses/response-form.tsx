@@ -46,6 +46,8 @@ type PendingEvidenceItem = {
 };
 
 const initialState: ResponseFormState = {};
+const MAX_EVIDENCE_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_EVIDENCE_TOTAL_BYTES = 5 * MAX_EVIDENCE_FILE_BYTES;
 
 export function AuditResponseForm({
   audit,
@@ -298,6 +300,23 @@ export function AuditResponseForm({
 
   const uploadEvidenceFiles = async (questionId: string, files: File[], draft: ResponseDraft) => {
     if (files.length === 0) {
+      return;
+    }
+
+    const oversizedFile = files.find((file) => file.size > MAX_EVIDENCE_FILE_BYTES);
+    if (files.length > 5 || oversizedFile || files.reduce((sum, file) => sum + file.size, 0) > MAX_EVIDENCE_TOTAL_BYTES) {
+      setClientToast({
+        type: "error",
+        message: oversizedFile
+          ? `File "${oversizedFile.name}" melebihi 10 MB.`
+          : "Maksimal 5 file aktif dengan total ukuran 50 MB.",
+        id: Date.now(),
+      });
+      setPendingEvidenceFiles((current) => {
+        const next = { ...current };
+        delete next[questionId];
+        return next;
+      });
       return;
     }
 
@@ -620,7 +639,6 @@ export function AuditResponseForm({
                   <small className="field-hint">Maksimal 5 file aktif per pertanyaan. Ukuran maksimal 10 MB per file, sehingga total maksimal 50 MB. Jika sudah 5 file, upload berikutnya menggantikan file paling lama.</small>
                   <input
                     className="evidence-file-input"
-                    name={`supportingFiles-${question.id}`}
                     type="file"
                     multiple
                     onChange={(event) => {
