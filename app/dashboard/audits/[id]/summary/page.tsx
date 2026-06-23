@@ -241,19 +241,19 @@ export default async function AuditSummaryPage({
         </div>
       </section>
 
-      {cobitSummary ? (
-        <CobitSummarySection
-          summary={cobitSummary}
-          companyName={audit.companyName}
-          auditDescription={audit.description}
-        />
-      ) : null}
-
       {isAdmin ? (
         <ApprovalPanel
           auditId={audit.id}
           status={audit.status}
           isAuditComplete={isAuditComplete}
+        />
+      ) : null}
+
+      {cobitSummary ? (
+        <CobitSummarySection
+          summary={cobitSummary}
+          companyName={audit.companyName}
+          auditDescription={audit.description}
         />
       ) : null}
 
@@ -782,32 +782,65 @@ function CobitSummarySection({
             </tr>
           </thead>
           <tbody>
-            {summary.objectives.map((objective, index) => (
-              <tr key={objective.objective}>
-                <td>{getCobitDomainTitle(objective.domain || objective.objective.slice(0, 3))}</td>
-                <td>{index + 1}</td>
-                <td><strong>{objective.objective}</strong></td>
-                {COBIT_LEVELS.map((levelNumber) => {
-                  const level = objective.levels.find((item) => item.level === levelNumber);
+            {summary.objectives.map((objective, index) => {
+              const domainCode = getCobitDomainCode(objective);
+              const previousDomainCode =
+                index > 0 ? getCobitDomainCode(summary.objectives[index - 1]) : null;
+              const isFirstDomainRow = domainCode !== previousDomainCode;
+              const domainRowSpan = isFirstDomainRow
+                ? countConsecutiveDomainRows(summary.objectives, index, domainCode)
+                : 0;
 
-                  return (
-                    <td key={levelNumber}>
-                      {level?.applicable ? (
-                        <CapabilityLevelScore rating={level.rating} percentage={level.percentage} />
-                      ) : (
-                        <CapabilityLevelScore rating="N/A" />
-                      )}
-                    </td>
-                  );
-                })}
-                <td><strong>{objective.achievedLevel}</strong></td>
-              </tr>
-            ))}
+              return (
+                <tr key={objective.objective}>
+                  {isFirstDomainRow ? (
+                    <td rowSpan={domainRowSpan}>{getCobitDomainTitle(domainCode)}</td>
+                  ) : null}
+                  <td>{index + 1}</td>
+                  <td><strong>{objective.objective}</strong></td>
+                  {COBIT_LEVELS.map((levelNumber) => {
+                    const level = objective.levels.find((item) => item.level === levelNumber);
+
+                    return (
+                      <td key={levelNumber}>
+                        {level?.applicable ? (
+                          <CapabilityLevelScore rating={level.rating} percentage={level.percentage} />
+                        ) : (
+                          <CapabilityLevelScore rating="N/A" />
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td><strong>{objective.achievedLevel}</strong></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </section>
   );
+}
+
+function getCobitDomainCode(objective: CobitAuditSummary["objectives"][number]) {
+  return objective.domain || objective.objective.slice(0, 3);
+}
+
+function countConsecutiveDomainRows(
+  objectives: CobitAuditSummary["objectives"],
+  startIndex: number,
+  domainCode: string,
+) {
+  let count = 0;
+
+  for (let index = startIndex; index < objectives.length; index += 1) {
+    if (getCobitDomainCode(objectives[index]) !== domainCode) {
+      break;
+    }
+    count += 1;
+  }
+
+  return count;
 }
 
 function CapabilityLevelScore({ rating, percentage }: { rating: string; percentage?: number }) {

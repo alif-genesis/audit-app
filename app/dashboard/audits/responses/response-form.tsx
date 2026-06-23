@@ -399,13 +399,21 @@ export function AuditResponseForm({
                       <td>{selectedObjective || "-"}</td>
                       {activeObjectiveSummary.levels.map((level) => (
                         <td key={level.level}>
-                          <strong>{level.rating}</strong>
-                          <span>{level.applicable ? `${level.percentage}% (${level.yes}/${level.total})` : "N/A"}</span>
-                          {level.applicable ? <span>Y: {level.yes} / N: {level.no}</span> : null}
+                          <CobitCapabilityScoreCard
+                            rating={level.rating}
+                            applicable={level.applicable}
+                            percentage={level.percentage}
+                            yes={level.yes}
+                            no={level.no}
+                            total={level.total}
+                          />
                         </td>
                       ))}
                       <td>
-                        <strong>{activeObjectiveSummary.achievedLevel}</strong>
+                        <span className="cobit-achieved-level-card">
+                          <span>Level</span>
+                          <strong>{activeObjectiveSummary.achievedLevel}</strong>
+                        </span>
                       </td>
                     </tr>
                   </tbody>
@@ -522,6 +530,7 @@ export function AuditResponseForm({
                   <span>File Pendukung</span>
                   <small className="field-hint">Maksimal 5 file aktif per pertanyaan. Ukuran maksimal 10 MB per file, sehingga total maksimal 50 MB. Jika sudah 5 file, upload berikutnya menggantikan file paling lama.</small>
                   <input
+                    className="evidence-file-input"
                     name={`supportingFiles-${question.id}`}
                     type="file"
                     multiple
@@ -603,6 +612,36 @@ function EvidenceUploadTable({
   );
 }
 
+function CobitCapabilityScoreCard({
+  rating,
+  applicable,
+  percentage,
+  yes,
+  no,
+  total,
+}: {
+  rating: string;
+  applicable: boolean;
+  percentage: number;
+  yes: number;
+  no: number;
+  total: number;
+}) {
+  const normalizedRating = applicable ? rating.toUpperCase() : "N/A";
+  const className = normalizedRating === "N/A" ? "na" : normalizedRating.toLowerCase();
+
+  return (
+    <span className={`cobit-capability-score-card ${className}`}>
+      <span className="cobit-capability-rating">{normalizedRating}</span>
+      <span className="cobit-capability-score-detail">
+        <strong>{applicable ? `${percentage}%` : "N/A"}</strong>
+        <span>{applicable ? `${yes}/${total} terpenuhi` : "Tidak berlaku"}</span>
+      </span>
+      {applicable ? <span className="cobit-capability-yn">Y: {yes} / N: {no}</span> : null}
+    </span>
+  );
+}
+
 function getEvidenceFileName(path: string) {
   const rawName = path.split("/").pop() || "Evidence";
   return rawName.replace(/^\d+-/, "");
@@ -639,7 +678,10 @@ function CobitLevelAverageTable({
         <tr>
           <td>{summary.objective}</td>
           <td>
-            <strong>{averageRating}</strong>
+            <span className={`cobit-average-rating-card ${averageRating === "N/A" ? "na" : averageRating.toLowerCase()}`}>
+              <span>Rating</span>
+              <strong>{averageRating}</strong>
+            </span>
           </td>
         </tr>
       </tbody>

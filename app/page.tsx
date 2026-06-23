@@ -18,7 +18,7 @@ export default function Home() {
             Framework Tata Kelola Lainnya.
           </p>
           <Link className="primary-button" href="/login">
-            Login Admin
+            Login
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
         </section>
