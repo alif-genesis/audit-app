@@ -65,11 +65,8 @@ export function AuditResponseForm({
   );
   const autoSaveTimersRef = useRef<Record<string, number>>({});
   const fileQuestionIdsRef = useRef<Set<string>>(new Set());
-  const formRef = useRef<HTMLFormElement>(null);
-  const fileAutoSaveButtonRef = useRef<HTMLButtonElement>(null);
   const [touchedQuestionIds, setTouchedQuestionIds] = useState<Set<string>>(() => new Set());
   const [fileQuestionIds, setFileQuestionIds] = useState<Set<string>>(() => new Set());
-  const [fileSaveRequestId, setFileSaveRequestId] = useState(0);
   const [pendingEvidenceFiles, setPendingEvidenceFiles] = useState<Record<string, PendingEvidenceItem[]>>({});
   const [liveResponses, setLiveResponses] = useState<Record<string, LiveResponse>>(() =>
     Object.fromEntries(
@@ -162,18 +159,6 @@ export function AuditResponseForm({
       fileQuestionIdsRef.current = new Set();
     }
   }, [state.toast]);
-
-  useEffect(() => {
-    if (fileSaveRequestId === 0) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      formRef.current?.requestSubmit(fileAutoSaveButtonRef.current ?? undefined);
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
-  }, [fileSaveRequestId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,6 +296,88 @@ export function AuditResponseForm({
     }
   };
 
+  const uploadEvidenceFiles = async (questionId: string, files: File[], draft: ResponseDraft) => {
+    if (files.length === 0) {
+      return;
+    }
+
+    const uploadFormData = new FormData();
+    uploadFormData.set("questionId", questionId);
+    uploadFormData.set("compliance", draft.compliance);
+    uploadFormData.set("description", draft.description);
+    files.forEach((file) => uploadFormData.append("files", file));
+
+    try {
+      const response = await fetch(`/api/audits/${audit.id}/responses`, {
+        method: "POST",
+        body: uploadFormData,
+      });
+      const data = (await response.json().catch(() => null)) as { response?: LiveResponse; error?: string } | null;
+
+      if (!response.ok || !data?.response) {
+        setClientToast({
+          type: "error",
+          message: data?.error ?? "File evidence gagal disimpan.",
+          id: Date.now(),
+        });
+        setPendingEvidenceFiles((current) => {
+          const next = { ...current };
+          delete next[questionId];
+          return next;
+        });
+        return;
+      }
+
+      setLiveResponses((current) => ({
+        ...current,
+        [data.response!.questionId]: data.response!,
+      }));
+      setResponseDrafts((current) => ({
+        ...current,
+        [data.response!.questionId]: {
+          questionId: data.response!.questionId,
+          compliance: data.response!.compliance || "NA",
+          description: data.response!.description || "",
+        },
+      }));
+      setPendingEvidenceFiles((current) => {
+        const next = { ...current };
+        delete next[questionId];
+        return next;
+      });
+      setTouchedQuestionIds((current) => {
+        const next = new Set(current);
+        next.delete(questionId);
+        if (next.size === 0) {
+          setHasUnsavedChanges(false);
+        }
+        return next;
+      });
+      setFileQuestionIds((current) => {
+        const next = new Set(current);
+        next.delete(questionId);
+        return next;
+      });
+      fileQuestionIdsRef.current.delete(questionId);
+      setClientToast({
+        type: "success",
+        message: "File evidence berhasil disimpan.",
+        id: Date.now(),
+      });
+    } catch {
+      setClientToast({
+        type: "error",
+        message: "File evidence gagal disimpan.",
+        id: Date.now(),
+      });
+      setPendingEvidenceFiles((current) => {
+        const next = { ...current };
+        delete next[questionId];
+        return next;
+      });
+    }
+  };
+
   const confirmNavigation = () => {
     if (!hasUnsavedChanges) {
       return true;
@@ -326,7 +393,7 @@ export function AuditResponseForm({
         message={visibleToast?.message}
       />
 
-      <form ref={formRef} action={formAction} className="audit-response-form">
+      <form action={formAction} className="audit-response-form">
         <input name="auditId" type="hidden" value={audit.id} />
         {[...new Set([...touchedQuestionIds, ...fileQuestionIds])].map((questionId) => (
           <input
@@ -337,18 +404,6 @@ export function AuditResponseForm({
             readOnly
           />
         ))}
-        <button
-          ref={fileAutoSaveButtonRef}
-          aria-hidden="true"
-          name="intent"
-          value="save"
-          type="submit"
-          tabIndex={-1}
-          style={{ position: "absolute", width: 1, height: 1, padding: 0, opacity: 0, pointerEvents: "none" }}
-        >
-          Simpan evidence
-        </button>
-
         <div className="user-filter audit-filter compact-filter">
           <CustomSelect
             name="question-filter"
@@ -570,18 +625,20 @@ export function AuditResponseForm({
                     multiple
                     onChange={(event) => {
                       const selectedFiles = Array.from(event.currentTarget.files ?? []);
+                      if (selectedFiles.length === 0) {
+                        return;
+                      }
+                      const currentDraft = responseDrafts[question.id] ?? draft;
                       setHasUnsavedChanges(true);
                       fileQuestionIdsRef.current = new Set(fileQuestionIdsRef.current).add(question.id);
-                      if (selectedFiles.length > 0) {
-                        setPendingEvidenceFiles((current) => ({
-                          ...current,
-                          [question.id]: selectedFiles.map((file) => ({
-                            key: `${file.name}-${file.size}-${file.lastModified}`,
-                            name: file.name,
-                            size: file.size,
-                          })),
-                        }));
-                      }
+                      setPendingEvidenceFiles((current) => ({
+                        ...current,
+                        [question.id]: selectedFiles.map((file) => ({
+                          key: `${file.name}-${file.size}-${file.lastModified}`,
+                          name: file.name,
+                          size: file.size,
+                        })),
+                      }));
                       setFileQuestionIds((current) => {
                         const next = new Set(current);
                         next.add(question.id);
@@ -593,7 +650,7 @@ export function AuditResponseForm({
                         return next;
                       });
                       hideCurrentToast();
-                      setFileSaveRequestId(Date.now());
+                      void uploadEvidenceFiles(question.id, selectedFiles, currentDraft);
                     }}
                   />
                   <EvidenceUploadTable

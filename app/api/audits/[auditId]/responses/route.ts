@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { ComplianceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { MAX_EVIDENCE_FILES, saveSupportingFiles } from "@/lib/audit-evidence-upload";
 
 type RouteContext = {
   params: Promise<{
@@ -194,6 +196,145 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     },
   });
+
+  return NextResponse.json({
+    response: {
+      questionId: response.questionId,
+      compliance: response.compliance,
+      description: response.description ?? "",
+      attachments: response.attachments,
+      evidenceFiles: response.evidenceFiles.map((file) => ({
+        path: file.downloadPath,
+        name: file.originalName,
+        size: file.fileSize,
+        uploadedAt: file.createdAt.toISOString(),
+      })),
+      submittedAt: response.submittedAt?.toISOString() ?? null,
+      updatedAt: response.updatedAt.toISOString(),
+    },
+  });
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser?.isActive) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { auditId } = await context.params;
+  const formData = await request.formData().catch(() => null);
+  const questionId = String(formData?.get("questionId") || "").trim();
+  const compliance = String(formData?.get("compliance") || "NA") as ComplianceStatus;
+  const description = String(formData?.get("description") || "");
+  const files = (formData?.getAll("files") ?? []).filter((file): file is File => file instanceof File && file.size > 0);
+
+  if (!questionId || !["NA", "COMPLY", "NOT_COMPLY"].includes(compliance)) {
+    return NextResponse.json({ error: "Invalid response payload" }, { status: 400 });
+  }
+
+  if (files.length === 0) {
+    return NextResponse.json({ error: "Tidak ada file evidence yang dipilih." }, { status: 400 });
+  }
+
+  const audit = await prisma.audit.findUnique({
+    where: { id: auditId },
+    select: {
+      id: true,
+      assignments: {
+        where: { auditeeId: currentUser.id },
+        select: { auditeeId: true },
+      },
+    },
+  });
+
+  if (!audit || audit.assignments.length === 0) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const existing = await prisma.auditResponse.findUnique({
+    where: {
+      auditId_auditeeId_questionId: {
+        auditId,
+        auditeeId: currentUser.id,
+        questionId,
+      },
+    },
+    select: {
+      submittedAt: true,
+      attachments: true,
+    },
+  });
+
+  if (!existing) {
+    return NextResponse.json({ error: "Response not found" }, { status: 404 });
+  }
+
+  if (existing.submittedAt) {
+    return NextResponse.json({ error: "Response already final" }, { status: 409 });
+  }
+
+  const uploadedFiles = await saveSupportingFiles({
+    auditId,
+    questionId,
+    auditeeId: currentUser.id,
+    uploadedById: currentUser.id,
+    files,
+  });
+
+  if ("error" in uploadedFiles) {
+    return NextResponse.json({ error: uploadedFiles.error }, { status: 400 });
+  }
+
+  const mergedAttachments = [...existing.attachments, ...uploadedFiles.paths];
+  const activeAttachments = mergedAttachments.slice(-MAX_EVIDENCE_FILES);
+  const replacedAttachments = mergedAttachments.slice(0, Math.max(0, mergedAttachments.length - MAX_EVIDENCE_FILES));
+
+  if (replacedAttachments.length > 0) {
+    await prisma.evidenceFile.updateMany({
+      where: {
+        auditId,
+        questionId,
+        downloadPath: { in: replacedAttachments },
+      },
+      data: { isActive: false },
+    });
+  }
+
+  const response = await prisma.auditResponse.update({
+    where: {
+      auditId_auditeeId_questionId: {
+        auditId,
+        auditeeId: currentUser.id,
+        questionId,
+      },
+    },
+    data: {
+      compliance,
+      description: description.trim(),
+      attachments: activeAttachments,
+    },
+    select: {
+      questionId: true,
+      compliance: true,
+      description: true,
+      attachments: true,
+      submittedAt: true,
+      updatedAt: true,
+      evidenceFiles: {
+        where: { isActive: true },
+        orderBy: { version: "asc" },
+        select: {
+          downloadPath: true,
+          originalName: true,
+          fileSize: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  revalidatePath(`/dashboard/audits/responses/${auditId}`);
+  revalidatePath(`/dashboard/audits/${auditId}/summary`);
 
   return NextResponse.json({
     response: {
