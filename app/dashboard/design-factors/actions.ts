@@ -51,6 +51,86 @@ export type DesignFactorFormState = {
   savedKey?: string;
 };
 
+export type DesignFactorReportState = {
+  success?: boolean;
+  message?: string;
+};
+
+const REPORT_FIELD_KEYS = [
+  "coverSubtitle",
+  "preparedBy",
+  "documentStatus",
+  "purposeNarrative",
+  "methodologyNarrative",
+  "profileNarrative",
+  "implicationNarrative",
+  "roadmapNarrative",
+  "executiveSummary",
+  "purposePriorityText",
+  "purposeFocusText",
+  "purposeRoadmapText",
+  "purposePriorityTitle",
+  "purposeFocusTitle",
+  "methodologyStep1",
+  "methodologyStep2",
+  "methodologyStep3",
+  "methodologyStep4",
+  "methodologyStep5",
+  "roadmapStep1",
+  "roadmapStep2",
+  "roadmapStep3",
+  "roadmapStep4",
+] as const;
+
+export async function saveDesignFactorReportAction(
+  assessmentId: string,
+  content: Record<string, string>,
+): Promise<DesignFactorReportState> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser?.isActive) {
+    return { success: false, message: "Sesi tidak valid. Silakan login kembali." };
+  }
+
+  const assessment = await prisma.designFactorAssessment.findUnique({
+    where: { id: assessmentId },
+    select: { id: true, name: true, auditorId: true, auditeeId: true, reportContent: true },
+  });
+  const hasAccess = Boolean(
+    assessment &&
+      (currentUser.role === "ADMIN" ||
+        assessment.auditorId === currentUser.id ||
+        assessment.auditeeId === currentUser.id),
+  );
+  if (!assessment || !hasAccess) {
+    return { success: false, message: "Anda tidak memiliki akses ke report ini." };
+  }
+
+  const sanitized = Object.fromEntries(
+    REPORT_FIELD_KEYS.map((key) => [key, String(content[key] ?? "").trim().slice(0, 4000)]),
+  );
+
+  await prisma.designFactorAssessment.update({
+    where: { id: assessmentId },
+    data: {
+      reportContent: {
+        ...sanitized,
+        ...(assessment.reportContent && typeof assessment.reportContent === "object" && !Array.isArray(assessment.reportContent) && "companyLogoPath" in assessment.reportContent
+          ? { companyLogoPath: String(assessment.reportContent.companyLogoPath ?? "") }
+          : {}),
+      },
+    },
+  });
+  await writeActivityLog({
+    action: "Update Design Factor Report",
+    entity: "DesignFactorAssessment",
+    entityId: assessmentId,
+    details: `${currentUser.name} memperbarui narasi report Design Factor "${assessment.name}".`,
+  });
+  revalidatePath(`/dashboard/design-factors/${assessmentId}/report`);
+
+  return { success: true, message: "Perubahan report berhasil disimpan." };
+}
+
 function parseNumber(value: FormDataEntryValue | null) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;

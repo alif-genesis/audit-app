@@ -3,7 +3,8 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Download, Info, Save, Send, X } from "lucide-react";
+import Link from "next/link";
+import { FileText, Info, Save, Send, X } from "lucide-react";
 import { Toast } from "@/components/toast";
 import {
   calculateDf01Results,
@@ -40,7 +41,6 @@ import {
   type Df10InputRow,
   type ObjectiveCalculation,
 } from "@/lib/cobit/designFactorMatrix";
-import { downloadSimpleReportPdf } from "@/lib/report-pdf";
 import { saveDf01AssessmentAction, type DesignFactorFormState } from "../actions";
 
 type UserSide = "AUDITEE" | "AUDITOR" | "ADMIN" | "NONE";
@@ -603,6 +603,7 @@ export function DesignFactorWorkspace({
 
       {activeTab === "SUMMARY" ? (
         <DesignFactorSummaryDashboard
+          assessmentId={assessmentId}
           assessmentStatus={assessmentStatus}
           companyName={companyName}
           isReady={allSubmitted}
@@ -923,6 +924,7 @@ type SummaryRow = {
 };
 
 function DesignFactorSummaryDashboard({
+  assessmentId,
   assessmentStatus,
   companyName,
   isReady,
@@ -930,6 +932,7 @@ function DesignFactorSummaryDashboard({
   selectedObjective,
   onSelectObjective,
 }: {
+  assessmentId: string;
   assessmentStatus: string;
   companyName: string;
   isReady: boolean;
@@ -949,14 +952,6 @@ function DesignFactorSummaryDashboard({
     level,
     count: rows.filter((row) => row.suggestedCapability === level).length,
   }));
-  const downloadedAt = new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date());
 
   if (!isReady && assessmentStatus !== "SUBMITTED" && assessmentStatus !== "REVIEWED" && assessmentStatus !== "APPROVED") {
     return (
@@ -978,98 +973,13 @@ function DesignFactorSummaryDashboard({
           <h2>Summary Dashboard - COBIT 2019 Design Factors</h2>
           <p>Prioritas domain COBIT berdasarkan hasil perhitungan DF01-DF10.</p>
         </div>
-        <button
+        <Link
           className="primary-button report-download-button"
-          type="button"
-          onClick={() =>
-            downloadSimpleReportPdf(
-              {
-                title: "LAPORAN PENILAIAN COBIT 2019",
-                subtitle: "CAPABILITY & DESIGN FACTOR ASSESSMENT",
-                downloadedAt,
-                summaryTitle: "RINGKASAN",
-                summaryText: `Laporan ini menyajikan ringkasan hasil Design Factors COBIT 2019 untuk ${companyName}. Hasil ini digunakan untuk menentukan area tata kelola dan manajemen I&T yang perlu menjadi prioritas organisasi.`,
-                totalLabel: "DOMAIN DIADOPSI LEVEL 2-4",
-                totalValue: String(adoptedRows.length),
-                stats: [
-                  { label: "Total Objective", value: String(rows.length) },
-                  { label: "Diadopsi", value: String(adoptedRows.length) },
-                  { label: "Level 4", value: String(levelCounts.find((item) => item.level === 4)?.count ?? 0) },
-                  { label: "Level 3", value: String(levelCounts.find((item) => item.level === 3)?.count ?? 0) },
-                  { label: "Level 2", value: String(levelCounts.find((item) => item.level === 2)?.count ?? 0) },
-                ],
-                sectionTitle: "DOMAIN DIADOPSI LEVEL 2-4",
-                bars: adoptedRows.map((row) => ({
-                  label: row.objective,
-                  value: row.priorityScore,
-                })),
-                note: "Domain dengan Suggested Capability Level 2, 3, dan 4 diadopsi dalam scope audit Design Factor. Domain Level 1 dikecualikan dari scope audit.",
-                tables: [
-                  {
-                    title: "Level Distribution",
-                    columns: ["Level", "Jumlah Domain"],
-                    rows: levelCounts.map((item) => [`Level ${item.level}`, `${item.count} domain`]),
-                  },
-                  {
-                    title: "Step 2: Initial Scope of the Governance System",
-                    columns: ["Domain", "Domain Name", "Initial Scope"],
-                    rows: sortedRows.map((row) => [row.objective, row.domainName, formatNumber(row.initialScope)]),
-                  },
-                  {
-                    title: "Step 3: Refined Scope of the Governance System",
-                    columns: ["Domain", "Domain Name", "Priority", "Capability", "Rank"],
-                    rows: sortedRows.map((row) => [
-                      row.objective,
-                      row.domainName,
-                      String(row.priorityScore),
-                      `Level ${row.suggestedCapability}`,
-                      `#${row.rank}`,
-                    ]),
-                  },
-                  {
-                    title: "Governance Objectives Priority Table",
-                    columns: ["Domain", "Initial", "Raw", "Priority", "Capability"],
-                    rows: sortedRows.map((row) => [
-                      row.objective,
-                      formatNumber(row.initialScope),
-                      formatNumber(row.rawScore),
-                      String(row.priorityScore),
-                      `Level ${row.suggestedCapability}`,
-                    ]),
-                  },
-                  {
-                    title: "Trace Contribution DF1-DF5",
-                    columns: ["Domain", "DF1", "DF2", "DF3", "DF4", "DF5"],
-                    rows: sortedRows.map((row) => [
-                      row.objective,
-                      formatNumber(row.df.DF01),
-                      formatNumber(row.df.DF02),
-                      formatNumber(row.df.DF03),
-                      formatNumber(row.df.DF04),
-                      formatNumber(row.df.DF05),
-                    ]),
-                  },
-                  {
-                    title: "Trace Contribution DF6-DF10",
-                    columns: ["Domain", "DF6", "DF7", "DF8", "DF9", "DF10"],
-                    rows: sortedRows.map((row) => [
-                      row.objective,
-                      formatNumber(row.df.DF06),
-                      formatNumber(row.df.DF07),
-                      formatNumber(row.df.DF08),
-                      formatNumber(row.df.DF09),
-                      formatNumber(row.df.DF10),
-                    ]),
-                  },
-                ],
-              },
-              `laporan-cobit-design-factor-${companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.pdf`,
-            )
-          }
+          href={`/dashboard/design-factors/${assessmentId}/report`}
         >
-          <Download size={16} aria-hidden="true" />
-          Download Report
-        </button>
+          <FileText size={16} aria-hidden="true" />
+          Buka Report
+        </Link>
       </div>
 
       <article className="users-panel df-insight-panel df-insight-top">
