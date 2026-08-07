@@ -38,7 +38,9 @@ export function DesignFactorReportDeck({ assessment, factorRows, summaryRows, st
   const [message, setMessage] = useState("");
   const [previewing, setPreviewing] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const shellRef = useRef<HTMLElement>(null);
+  const captureDeckRef = useRef<HTMLElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
   const slides = buildSlides(assessment, factorRows, summaryRows, content, editing, setContent);
@@ -70,11 +72,21 @@ export function DesignFactorReportDeck({ assessment, factorRows, summaryRows, st
     });
   }
 
-  function downloadPdf() {
-    const previous = document.title;
-    document.title = `Report-Design-Factor-${slug(assessment.companyName)}`;
-    window.print();
-    window.setTimeout(() => { document.title = previous; }, 500);
+  async function downloadPdf() {
+    const deck = captureDeckRef.current;
+    if (!deck || downloadingPdf) return;
+    setDownloadingPdf(true);
+    setMessage("Menyiapkan PDF...");
+    try {
+      const pages = await renderSlidesToJpegs(Array.from(deck.querySelectorAll<HTMLElement>("[data-pdf-slide]")));
+      downloadBlob(buildImagePdf(pages), `Report-Design-Factor-${slug(assessment.companyName)}.pdf`);
+      setMessage("PDF berhasil diunduh.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "PDF gagal dibuat.");
+    } finally {
+      setDownloadingPdf(false);
+      window.setTimeout(() => setMessage(""), 3500);
+    }
   }
 
   async function openPreview() {
@@ -129,7 +141,9 @@ export function DesignFactorReportDeck({ assessment, factorRows, summaryRows, st
           <button className={editing ? styles.saveButton : styles.ghostButton} onClick={editing ? save : () => setEditing(true)} disabled={pending}>
             {editing ? <Save size={17} /> : <Pencil size={17} />}{pending ? "Menyimpan..." : editing ? "Save" : "Edit"}
           </button>
-          <button className={styles.downloadButton} onClick={downloadPdf}><Download size={17} /> Download PDF</button>
+          <button className={styles.downloadButton} onClick={downloadPdf} disabled={downloadingPdf}>
+            <Download size={17} /> {downloadingPdf ? "Preparing..." : "Download PDF"}
+          </button>
         </div>
       </nav>
 
@@ -158,8 +172,8 @@ export function DesignFactorReportDeck({ assessment, factorRows, summaryRows, st
       </div>
       <footer className={styles.footer}>© {new Date().getFullYear()} {assessment.companyName} · COBIT 2019 Design Factor Assessment <span>Gunakan tombol panah kiri / kanan untuk navigasi</span></footer>
 
-      <section className={`df-report-print ${styles.printDeck}`} aria-hidden="true">
-        {slides.map((item, index) => <article className={`${styles.slide} ${styles.printSlide}`} key={item.title}><span className={styles.printNumber}>{index + 1} / {slides.length}</span>{item.node}</article>)}
+      <section ref={captureDeckRef} className={styles.captureDeck} aria-hidden="true">
+        {slides.map((item) => <article className={`${styles.slide} ${styles.captureSlide}`} data-pdf-slide key={item.title}>{item.node}</article>)}
       </section>
     </main>
   );
@@ -179,7 +193,6 @@ function buildSlides(
   ) : <p>{content[key]}</p>;
   const sorted = [...summaryRows].sort((a, b) => a.rank - b.rank);
   const adopted = sorted.filter((row) => row.suggestedCapability >= 2);
-  const top = sorted.slice(0, 8);
   const slides: Array<{ title: string; node: React.ReactNode }> = [
     { title: "Cover Design Factor", node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="COBIT 2019 · DESIGN FACTORS"><div className={styles.cover}><span>ASSESSMENT REPORT</span><h1>{assessment.name}</h1>{field("coverSubtitle")}<i /><div className={styles.coverMeta}><Meta label="Company" value={assessment.companyName} /><Meta label="Penyusun" value="PT Genetika Solusi Bisnis" /><Meta label="Tanggal" value={formatMonth(assessment.updatedAt)} /><Meta label="Status" value="Selesai" /></div></div></SlideFrame> },
     { title: "Tujuan Analisis", node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="01 · ARAH ANALISIS" title="Tujuan Analisis Design Factor"><Narrative field={field("purposeNarrative")} /><CardGrid items={[[field("purposePriorityTitle", false), field("purposePriorityText")], [field("purposeFocusTitle", false), field("purposeFocusText")], ["Dasar Roadmap", field("purposeRoadmapText")]]} /></SlideFrame> },
@@ -191,17 +204,13 @@ function buildSlides(
     const factorLabel = formatFactorCode(code);
     slides.push({ title: `${factorLabel} ${reportFactorLabels[code]}`, node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow={`${factorLabel} · DYNAMIC ASSESSMENT`} title={reportFactorLabels[code]}><FactorView codes={[code]} factorRows={factorRows} summaryRows={summaryRows} /></SlideFrame> });
   });
-  slides.push({ title: "Hasil Akhir Priority GMO", node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="15 · HASIL AKHIR" title="Governance Objectives Priority"><div className={styles.stats}><Stat value={String(adopted.length)} label="Objective Diadopsi" /><Stat value={String(summaryRows.filter((row) => row.suggestedCapability === 4).length)} label="Capability Level 4" /><Stat value={String(summaryRows.length)} label="Total Objective" /></div><PriorityTable rows={top} /></SlideFrame> });
-  const recommendationPages = chunk(adopted, 6);
-  recommendationPages.forEach((rows, pageIndex) => {
-    const pageLabel = recommendationPages.length > 1 ? ` ${pageIndex + 1}/${recommendationPages.length}` : "";
-    slides.push({
-      title: `Arahan Rekomendasi${pageLabel}`,
-      node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow={`${16 + pageIndex} · IMPLIKASI`} title={`Arahan Rekomendasi Tata Kelola${pageLabel}`}>
-        {pageIndex === 0 ? <Narrative field={field("implicationNarrative")} /> : null}
-        <div className={styles.recommendationGrid}>{rows.map((row) => <article key={row.objective}><b>#{row.rank}</b><h2>{row.objective}</h2><p>Priority {row.priorityScore}</p><strong>Capability Level {row.suggestedCapability}</strong></article>)}</div>
-      </SlideFrame>,
-    });
+  slides.push({ title: "Hasil Akhir Priority GMO", node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="15 · HASIL AKHIR" title="Hasil Akhir Priority GMO"><div className={styles.stats}><Stat value={String(adopted.length)} label="Objective Diadopsi" /><Stat value={String(summaryRows.filter((row) => row.suggestedCapability === 4).length)} label="Capability Level 4" /><Stat value={String(summaryRows.length)} label="Total Objective" /></div><PriorityTable rows={adopted} /></SlideFrame> });
+  slides.push({
+    title: "Arahan Rekomendasi",
+    node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="16 · IMPLIKASI" title="Arahan Rekomendasi Tata Kelola">
+      <Narrative field={field("implicationNarrative")} />
+      <div className={`${styles.recommendationGrid} ${styles.recommendationGridCompact}`}>{adopted.map((row) => <article key={row.objective}><b>#{row.rank}</b><h2>{row.objective}</h2><p>Priority {row.priorityScore}</p><strong>Capability Level {row.suggestedCapability}</strong></article>)}</div>
+    </SlideFrame>,
   });
   return slides;
 }
@@ -219,7 +228,7 @@ function FactorView({ codes, factorRows, summaryRows }: { codes: ReportFactorCod
   })}</div>;
 }
 
-function PriorityTable({ rows }: { rows: ReportSummaryRow[] }) { return <div className={styles.table}><div className={styles.tableHead}><span>Rank</span><span>Objective</span><span>Priority</span><span>Capability</span></div>{rows.map((row) => <div key={row.objective}><span>#{row.rank}</span><strong>{row.objective}</strong><span>{row.priorityScore}</span><span>Level {row.suggestedCapability}</span></div>)}</div>; }
+function PriorityTable({ rows }: { rows: ReportSummaryRow[] }) { return <div className={`${styles.table} ${styles.priorityTable}`}><div className={styles.tableHead}><span>Rank</span><span>Objective</span><span>Priority</span><span>Capability</span></div>{rows.map((row) => <div key={row.objective}><span>#{row.rank}</span><strong>{row.objective}</strong><span>{row.priorityScore}</span><span>Level {row.suggestedCapability}</span></div>)}</div>; }
 function Narrative({ field }: { field: React.ReactNode }) { return <div className={styles.narrative}>{field}</div>; }
 function CardGrid({ items }: { items: React.ReactNode[][] }) { return <div className={styles.cardGrid}>{items.map(([title, body], index) => <article key={index}><b>{String(index + 1).padStart(2, "0")}</b><div className={styles.cardTitle}>{title}</div><div className={styles.cardCopy}>{body}</div></article>)}</div>; }
 function Process({ items }: { items: React.ReactNode[] }) { return <div className={styles.process}>{items.map((item, index) => <div key={index}><b>{index + 1}</b><div className={styles.processCopy}>{item}</div></div>)}</div>; }
@@ -262,4 +271,174 @@ function formatNumber(value: number) { return Number.isInteger(value) ? String(v
 function formatStatus(value: string) { return value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function slug(value: string) { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function formatFactorCode(value: ReportFactorCode) { return `DF${Number(value.slice(2))}`; }
-function chunk<T>(items: T[], size: number) { return Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, index * size + size)); }
+
+type PdfPageImage = {
+  width: number;
+  height: number;
+  data: Uint8Array;
+};
+
+async function renderSlidesToJpegs(slides: HTMLElement[]): Promise<PdfPageImage[]> {
+  if (!slides.length) throw new Error("Tidak ada slide untuk dibuat PDF.");
+  const pages: PdfPageImage[] = [];
+  for (const slide of slides) {
+    await replaceImagesWithDataUrls(slide);
+    const canvas = await renderElementToCanvas(slide);
+    pages.push({
+      width: canvas.width,
+      height: canvas.height,
+      data: base64ToBytes(canvas.toDataURL("image/jpeg", 0.94).split(",")[1] ?? ""),
+    });
+  }
+  return pages;
+}
+
+async function replaceImagesWithDataUrls(root: HTMLElement) {
+  const images = Array.from(root.querySelectorAll<HTMLImageElement>("img"));
+  await Promise.all(images.map(async (image) => {
+    const source = image.currentSrc || image.src;
+    if (!source || source.startsWith("data:")) return;
+    try {
+      const response = await fetch(source);
+      const blob = await response.blob();
+      image.src = await blobToDataUrl(blob);
+      await image.decode().catch(() => undefined);
+    } catch {
+      // Keep the original image source; same-origin assets usually still render.
+    }
+  }));
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function renderElementToCanvas(element: HTMLElement) {
+  const width = element.offsetWidth;
+  const height = element.offsetHeight;
+  const clone = element.cloneNode(true) as HTMLElement;
+  inlineComputedStyles(element, clone);
+  const html = new XMLSerializer().serializeToString(clone);
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    `<foreignObject width="100%" height="100%">`,
+    `<div xmlns="http://www.w3.org/1999/xhtml">${html}</div>`,
+    `</foreignObject>`,
+    `</svg>`,
+  ].join("");
+  const image = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Browser tidak dapat membuat PDF dari slide.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function inlineComputedStyles(source: Element, target: Element) {
+  const computed = window.getComputedStyle(source);
+  const style = Array.from(computed).map((name) => `${name}:${computed.getPropertyValue(name)};`).join("");
+  (target as HTMLElement).setAttribute("style", style);
+  const sourceChildren = Array.from(source.children);
+  const targetChildren = Array.from(target.children);
+  sourceChildren.forEach((child, index) => {
+    const targetChild = targetChildren[index];
+    if (targetChild) inlineComputedStyles(child, targetChild);
+  });
+}
+
+function loadImage(source: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Slide gagal dirender menjadi gambar."));
+    image.src = source;
+  });
+}
+
+function buildImagePdf(pages: PdfPageImage[]) {
+  const pageWidth = 841.89;
+  const pageHeight = 595.28;
+  const objects: Array<string | Array<string | Uint8Array>> = [];
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objects.push(`<< /Type /Pages /Kids [${pages.map((_, index) => `${3 + index * 3} 0 R`).join(" ")}] /Count ${pages.length} >>`);
+  pages.forEach((page, index) => {
+    const pageObject = 3 + index * 3;
+    const contentObject = pageObject + 1;
+    const imageObject = pageObject + 2;
+    const draw = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Im${index} Do\nQ`;
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im${index} ${imageObject} 0 R >> >> /Contents ${contentObject} 0 R >>`);
+    objects.push(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`);
+    objects.push([
+      `<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.data.byteLength} >>\nstream\n`,
+      page.data,
+      "\nendstream",
+    ]);
+  });
+  return new Blob([makePdf(objects)], { type: "application/pdf" });
+}
+
+function makePdf(objects: Array<string | Array<string | Uint8Array>>) {
+  const encoder = new TextEncoder();
+  const chunks: Uint8Array[] = [encoder.encode("%PDF-1.4\n")];
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(byteLength(chunks));
+    chunks.push(encoder.encode(`${index + 1} 0 obj\n`));
+    chunks.push(...normalizePdfObject(object, encoder));
+    chunks.push(encoder.encode("\nendobj\n"));
+  });
+  const xref = byteLength(chunks);
+  chunks.push(encoder.encode(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`));
+  offsets.slice(1).forEach((offset) => {
+    chunks.push(encoder.encode(`${String(offset).padStart(10, "0")} 00000 n \n`));
+  });
+  chunks.push(encoder.encode(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`));
+  return concatBytes(chunks);
+}
+
+function normalizePdfObject(object: string | Array<string | Uint8Array>, encoder: TextEncoder) {
+  const parts = Array.isArray(object) ? object : [object];
+  return parts.map((part) => typeof part === "string" ? encoder.encode(part) : part);
+}
+
+function base64ToBytes(base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function byteLength(chunks: Uint8Array[]) {
+  return chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+}
+
+function concatBytes(chunks: Uint8Array[]) {
+  const output = new Uint8Array(byteLength(chunks));
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  });
+  return output;
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 500);
+}

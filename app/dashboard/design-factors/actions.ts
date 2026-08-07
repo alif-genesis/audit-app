@@ -115,7 +115,11 @@ export async function saveDesignFactorReportAction(
       reportContent: {
         ...sanitized,
         ...(assessment.reportContent && typeof assessment.reportContent === "object" && !Array.isArray(assessment.reportContent) && "companyLogoPath" in assessment.reportContent
-          ? { companyLogoPath: String(assessment.reportContent.companyLogoPath ?? "") }
+          ? {
+              companyLogoPath: String(assessment.reportContent.companyLogoPath ?? ""),
+              companyLogoStoragePath: String(assessment.reportContent.companyLogoStoragePath ?? ""),
+              companyLogoMimeType: String(assessment.reportContent.companyLogoMimeType ?? ""),
+            }
           : {}),
       },
     },

@@ -37,6 +37,9 @@ export default async function DesignFactorReportPage({ params }: { params: Promi
       ? (assessment.reportContent as Record<string, unknown>)
       : {};
   const content = Object.fromEntries(Object.entries(storedContent).map(([key, value]) => [key, String(value ?? "")]));
+  if (content.companyLogoPath) {
+    content.companyLogoPath = `/api/design-factors/${assessment.id}/report-logo`;
+  }
 
   return (
     <DesignFactorReportDeck
