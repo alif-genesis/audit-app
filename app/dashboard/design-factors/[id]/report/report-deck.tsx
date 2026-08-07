@@ -207,7 +207,7 @@ function buildSlides(
   slides.push({ title: "Hasil Akhir Priority GMO", node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="15 · HASIL AKHIR" title="Hasil Akhir Priority GMO"><div className={styles.stats}><Stat value={String(adopted.length)} label="Objective Diadopsi" /><Stat value={String(summaryRows.filter((row) => row.suggestedCapability === 4).length)} label="Capability Level 4" /><Stat value={String(summaryRows.length)} label="Total Objective" /></div><PriorityTable rows={adopted} /></SlideFrame> });
   slides.push({
     title: "Arahan Rekomendasi",
-    node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="16 · IMPLIKASI" title="Arahan Rekomendasi Tata Kelola">
+    node: <SlideFrame company={assessment.companyName} logoUrl={content.companyLogoPath} eyebrow="16 · IMPLIKASI" title="Arahan Rekomendasi Tata Kelola" className={styles.compactRecommendationSlide}>
       <Narrative field={field("implicationNarrative")} />
       <div className={`${styles.recommendationGrid} ${styles.recommendationGridCompact}`}>{adopted.map((row) => <article key={row.objective}><b>#{row.rank}</b><h2>{row.objective}</h2><p>Priority {row.priorityScore}</p><strong>Capability Level {row.suggestedCapability}</strong></article>)}</div>
     </SlideFrame>,
@@ -215,8 +215,8 @@ function buildSlides(
   return slides;
 }
 
-function SlideFrame({ company, logoUrl, eyebrow, title, children }: { company: string; logoUrl?: string; eyebrow: string; title?: string; children: React.ReactNode }) {
-  return <div className={styles.slideInner}><header><div><span className={styles.eyebrow}>{eyebrow}</span>{title ? <h1>{title}</h1> : null}</div><div className={styles.slideBrands}><img className={styles.genesisSlideLogo} src="/genetika-1-warna.png" alt="PT Genetika Solusi Bisnis" /><i /><div className={styles.companyMark}>{logoUrl ? <img src={logoUrl} alt={`Logo ${company}`} /> : <><Leaf size={18} /><b>{company}</b></>}</div></div></header><div className={styles.slideBody}>{children}</div><div className={styles.accent} /></div>;
+function SlideFrame({ company, logoUrl, eyebrow, title, children, className = "" }: { company: string; logoUrl?: string; eyebrow: string; title?: string; children: React.ReactNode; className?: string }) {
+  return <div className={`${styles.slideInner} ${className}`}><header><div><span className={styles.eyebrow}>{eyebrow}</span>{title ? <h1>{title}</h1> : null}</div><div className={styles.slideBrands}><img className={styles.genesisSlideLogo} src="/genetika-1-warna.png" alt="PT Genetika Solusi Bisnis" /><i /><div className={styles.companyMark}>{logoUrl ? <img src={logoUrl} alt={`Logo ${company}`} /> : <><Leaf size={18} /><b>{company}</b></>}</div></div></header><div className={styles.slideBody}>{children}</div><div className={styles.accent} /></div>;
 }
 
 function FactorView({ codes, factorRows, summaryRows }: { codes: ReportFactorCode[]; factorRows: Record<ReportFactorCode, ReportInputRow[]>; summaryRows: ReportSummaryRow[] }) {
@@ -366,8 +366,8 @@ function loadImage(source: string) {
 }
 
 function buildImagePdf(pages: PdfPageImage[]) {
-  const pageWidth = 841.89;
-  const pageHeight = 595.28;
+  const pageWidth = 960;
+  const pageHeight = 540;
   const objects: Array<string | Array<string | Uint8Array>> = [];
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
   objects.push(`<< /Type /Pages /Kids [${pages.map((_, index) => `${3 + index * 3} 0 R`).join(" ")}] /Count ${pages.length} >>`);
